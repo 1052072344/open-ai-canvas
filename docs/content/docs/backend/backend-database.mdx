@@ -29,6 +29,45 @@ description: 影策后端核心持久化表与状态边界
 
 版本 3 会将 `wardrobe`、`weapon`、`accessory` 迁移为 `prop`，将 `style` 迁移为 `material`，并把原先归入 `other` 的图片、视频、音频和 3D 模型迁移为 `material`。迁移只合并重复的待确认候选：保留最早记录，其余标记为 `ignored`；已经确认的资产不会被自动删除或归并。
 
+## 已部署 PostgreSQL 的素材 bytes 修复
+
+升级到包含修复工具的镜像后，由部署管理员执行一次，无需终端用户修改数据库、清缓存或重建画布。旧镜像不支持以下子命令；请先将部署配置中的镜像版本更新为实际发布的修复版本。此操作不增加表或改变 schema 版本，也不会在启动时静默修改素材。
+
+`migrate-schema repair-asset-bytes` 默认只检查，`--apply` 才写入。它按 100 条分批扫描媒体素材，只修复无效的 `data.bytes`，从明确的 `resource:` 引用取得同用户、同类型、就绪且大小为正的资源 `size`。JSON 其他字段、素材 ID、文件和项目引用保留，仅同步推进素材及 JSON 的 `updatedAt`。没有可靠资源或存在其他合同错误的素材保持原样并列入 `unresolved`；存在未解决记录时命令非零退出，即使其他可修复记录已成功提交，也不代表全部修复。
+
+在原部署目录使用原来的环境文件执行；若部署使用了额外 Compose 文件，所有命令必须沿用相同参数。下面对应仓库标准 PostgreSQL Compose：
+
+```bash
+# 先下载实际发布的修复版本，再只读检查；不会启动后端。
+docker compose -f docker-compose.deploy.yml pull migrate backend web
+docker compose -f docker-compose.deploy.yml run --rm --no-deps migrate repair-asset-bytes
+```
+
+审阅报告，确认可修复范围后再进入维护窗口。多副本/独立 worker 也必须全部停止写入。备份或校验失败时停止操作，不能继续执行修复：
+
+```bash
+docker compose -f docker-compose.deploy.yml stop backend
+
+# 备份必须成功才可继续。备份含用户数据，限制权限，不上传或提交仓库。
+umask 077
+backup="asset-bytes-before-$(date +%Y%m%d-%H%M%S).dump"
+docker compose -f docker-compose.deploy.yml exec -T postgres \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup" || exit 1
+docker compose -f docker-compose.deploy.yml exec -T postgres pg_restore --list < "$backup" > /dev/null || exit 1
+```
+
+确认备份和检查均成功后执行写入，保留 JSON 报告：
+
+```bash
+docker compose -f docker-compose.deploy.yml run --rm --no-deps migrate repair-asset-bytes --apply
+docker compose -f docker-compose.deploy.yml run --rm --no-deps migrate repair-asset-bytes
+
+# 核查 repaired / unresolved，再恢复服务。
+docker compose -f docker-compose.deploy.yml up -d backend web
+```
+
+若报告仍有 `unresolved`，需按素材 ID 核查实际文件大小及引用；不要批量填零，也不要把未解决记录删除。工具不访问外部 URL，不下载媒体。应用后让用户重新加载素材库验证；不会要求清空本地存储。若数据库更新失败或检测到并发修改，整批写入事务回滚，`repaired` 为零。已成功提交后的回滚应在隔离数据库恢复备份并核查，再选择性恢复相关记录；不要在恢复写入后直接覆盖整库，以免丢失后续数据。
+
 ## 平台外观配置
 
 平台外观复用既有 `system_settings` 表，不新增结构迁移。键 `appearance` 的 JSON 值使用版本化合同；版本 3 保存品牌名称、英文品牌标识、登录页主标题与可选说明文案、浅色与可选深色 Logo 资源 ID、Logo 外框开关、登录页视频资源 ID、可选封面资源 ID 和预留皮肤 ID。只配置一套 Logo 时，公开投影会在浅色和深色主题复用同一资源；旧版本缺少深色 Logo 与外框字段时分别回退到单 Logo 和启用外框，不改变既有视觉。资源元数据和文件仍分别由 `resources` 表与当前资源存储承担。恢复默认外观时删除这条设置记录并回到内置值，不级联删除已经上传的资源。
