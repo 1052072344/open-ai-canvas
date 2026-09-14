@@ -573,3 +573,80 @@ func TestCloudAgentNodeTypesExposeExecutableAllowList(t *testing.T) {
 		}
 	}
 }
+
+func TestCloudAgentCanvasApprovalAdmissionFailureTerminatesRun(t *testing.T) {
+	s, db, _, _ := creationTestService(t)
+	canvas := model.CanvasProject{ID: "agent-canvas", UserID: "user", Title: "test", PayloadJSON: `{"nodes":[]}`}
+	if err := db.Create(&canvas).Error; err != nil {
+		t.Fatal(err)
+	}
+	req := agentTestRequest()
+	req.PermissionMode = "request_approval"
+	root, err := s.CreateCloudAgentRun("user", req, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := creationDocument(canvas.PayloadJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args, err := json.Marshal(map[string]any{
+		"snapshotHash": cloudAgentCanvasHash(doc),
+		"ops":          []map[string]any{{"type": "unsupported_canvas_op", "id": "bad-op"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := json.Marshal(map[string]any{
+		"toolCalls": []map[string]any{{
+			"id": "write-1", "type": "function", "function": map[string]any{
+				"name": "canvas_apply_ops", "arguments": string(args),
+			},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var task model.Task
+	if err := db.First(&task, "id = ?", root.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&model.Task{}).Where("id = ?", root.ID).Updates(map[string]any{
+		"status": model.TaskStatusSucceeded, "result_json": string(result), "input_json": publicTaskInputJSON(task.InputJSON),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.advanceCloudAgentByID("user", root.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.advanceCloudAgentByID("user", root.ID); err != nil {
+		t.Fatal(err)
+	}
+	failed, err := s.repo.CloudAgent("user", root.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := cloudAgentDecode(failed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failed.Status != "failed" || failed.FailureMessage != "不支持的画布写操作" {
+		t.Fatalf("admission failure did not terminate run: status=%q message=%q", failed.Status, failed.FailureMessage)
+	}
+	if len(state.Events) == 0 || state.Events[len(state.Events)-1].Type != "run_failed" || state.Events[len(state.Events)-1].Payload["reason"] != "tool_admission_failed" {
+		t.Fatalf("missing admission failure event: %+v", state.Events)
+	}
+	eventCount := len(state.Events)
+	if err := s.advanceCloudAgentByID("user", root.ID); err != nil {
+		t.Fatal(err)
+	}
+	failedAgain, err := s.repo.CloudAgent("user", root.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateAgain, err := cloudAgentDecode(failedAgain)
+	if err != nil || len(stateAgain.Events) != eventCount {
+		t.Fatalf("terminal run was replayed: err=%v events=%d want=%d", err, len(stateAgain.Events), eventCount)
+	}
+}

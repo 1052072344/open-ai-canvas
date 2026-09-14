@@ -598,6 +598,21 @@ func (s *Service) failCloudAgent(run *model.CloudAgentExecution, state *cloudAge
 	})
 }
 
+// failCloudAgentAdmission records deterministic tool admission failures in the
+// same checkpoint transaction. Transient repository errors must still escape
+// the caller so the scheduler can retry them.
+func failCloudAgentAdmission(current *model.CloudAgentExecution, state *cloudAgentRuntime, runID string, err error) error {
+	message := cloudAgentSafeToolError(err)
+	current.Status = "failed"
+	current.FailureMessage = message
+	state.Approval = nil
+	state.event(runID, "run_failed", map[string]any{
+		"text":   message,
+		"reason": "tool_admission_failed",
+	})
+	return cloudAgentSave(current, state)
+}
+
 // Only expose known failure categories; raw provider errors can contain URLs and credentials.
 func cloudAgentModelFailure(task *model.Task) (string, string) {
 	detail, reason := "模型任务未成功", "model_task_failed"
@@ -769,6 +784,10 @@ func (s *Service) advanceCloudAgentTool(run *model.CloudAgentExecution, state *c
 			} else {
 				canvasPlan, err := prepareCloudAgentCanvasMutation(repo, run.UserID, state.Request.CanvasID, call)
 				if err != nil {
+					var appErr *AppError
+					if errors.As(err, &appErr) && appErr != nil {
+						return failCloudAgentAdmission(current, state, run.ID, err)
+					}
 					return err
 				}
 				preview = canvasPlan.Preview
