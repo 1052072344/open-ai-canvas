@@ -1090,6 +1090,12 @@ function applyAgentEvent(event: AgentEvent, setMessages: Dispatch<SetStateAction
         setMessages((current) => upsertTextMessage(current, String(payload.messageId || "assistant"), text, true));
         return;
     }
+    if (event.type === "reasoning_delta" || event.type === "reasoning_message") {
+        const id = String(payload.messageId || `${event.runId}:reasoning`);
+        setMessages((current) => upsertTextMessage(current, id, text, event.type === "reasoning_delta")
+            .map((item) => item.id === id ? { ...item, reasoning: true } : item));
+        return;
+    }
     if (event.type === "assistant_message") {
         setMessages((current) => upsertTextMessage(current, String(payload.messageId || event.eventId), text, false));
         return;

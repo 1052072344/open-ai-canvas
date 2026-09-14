@@ -319,6 +319,10 @@ func executeProtocolRequest(ctx context.Context, config providerConfig, spec pro
 // method/path/body/auth；最终 URL 校验、凭证注入、SSRF、超时、大小限制和审计仍由宿主统一执行，
 // 插件不能通过自定义请求规格绕过这些安全约束。
 func executeProtocolBinaryRequest(ctx context.Context, config providerConfig, spec protocol.RequestSpec) ([]byte, string, error) {
+	return executeProtocolBinaryRequestWithConsumer(ctx, config, spec, nil)
+}
+
+func executeProtocolBinaryRequestWithConsumer(ctx context.Context, config providerConfig, spec protocol.RequestSpec, consume func(string, []byte)) ([]byte, string, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, "", err
 	}
@@ -344,6 +348,10 @@ func executeProtocolBinaryRequest(ctx context.Context, config providerConfig, sp
 	ApplyOutboundHeaders(req, config.Headers)
 	if err := applyProtocolAuth(req, config, spec.Auth); err != nil {
 		return nil, "", err
+	}
+	if consume != nil {
+		req.Header.Set("Accept", "text/event-stream")
+		return doBinaryWithConsumer(req, consume)
 	}
 	return doBinary(req)
 }

@@ -30,6 +30,7 @@ export type CloudAgentChatMessage = {
     title?: string;
     text: string;
     streaming?: boolean;
+    reasoning?: boolean;
     meta?: string;
     detail?: unknown;
     attachments?: CloudAgentChatAttachment[];
@@ -91,6 +92,12 @@ export function AgentChatMessage({
     const isUser = item.role === "user";
     const isSystem = item.role === "system";
     const color = item.role === "error" ? "#ef4444" : theme.node.text;
+    if (item.reasoning) {
+        return <details className="min-w-0 text-xs" style={{ color: theme.node.muted }}>
+            <summary className="cursor-pointer py-1 focus-visible:outline-auto">{item.streaming ? "模型推理中" : "模型推理摘要"}</summary>
+            <div className="max-h-64 overflow-auto whitespace-pre-wrap break-words py-2" data-canvas-wheel-scroll>{item.text}</div>
+        </details>;
+    }
     if (isSystem) {
         return (
             <div className="flex items-start gap-3 text-xs">

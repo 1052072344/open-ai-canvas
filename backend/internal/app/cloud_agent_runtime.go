@@ -507,6 +507,7 @@ func (s *Service) advanceCloudAgent(run *model.CloudAgentExecution) (err error) 
 		}
 		var result struct {
 			Text      string           `json:"text"`
+			Reasoning string           `json:"reasoning"`
 			ToolCalls []cloudAgentCall `json:"toolCalls"`
 			Legacy    []cloudAgentCall `json:"tool_calls"`
 		}
@@ -534,6 +535,9 @@ func (s *Service) advanceCloudAgent(run *model.CloudAgentExecution) (err error) 
 				return cloudAgentSave(current, &state)
 			}
 			calls := result.ToolCalls
+			if result.Reasoning != "" {
+				state.event(run.ID, "reasoning_message", map[string]any{"messageId": task.ID + ":reasoning", "text": truncateRunes(result.Reasoning, 8000)})
+			}
 			if result.Text != "" {
 				state.event(run.ID, "assistant_message", map[string]any{"messageId": task.ID, "text": result.Text})
 				if len(calls) == 0 {
@@ -784,6 +788,11 @@ func (s *Service) advanceCloudAgentTool(run *model.CloudAgentExecution, state *c
 			} else {
 				canvasPlan, err := prepareCloudAgentCanvasMutation(repo, run.UserID, state.Request.CanvasID, call)
 				if err != nil {
+					var argumentErr *cloudAgentArgumentError
+					if errors.As(err, &argumentErr) {
+						cloudAgentToolResult(run.ID, state, call, nil, err)
+						return cloudAgentSave(current, state)
+					}
 					var appErr *AppError
 					if errors.As(err, &appErr) && appErr != nil {
 						return failCloudAgentAdmission(current, state, run.ID, err)

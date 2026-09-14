@@ -1,6 +1,7 @@
 package app
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -103,7 +104,9 @@ func cloudAgentCanonical(system string, history []providerTextMessage, prompt st
 		messages = append(messages, map[string]any{"role": m.Role, "content": m.Content})
 	}
 	messages = append(messages, map[string]any{"role": "user", "content": prompt})
-	return canonicalAgentRequest{SystemPrompt: system, Messages: messages, Tools: cloudAgentTools(req), ToolChoice: "auto"}
+	// Keep routing stable across tool turns, without exposing canvas identifiers.
+	cacheHash := sha256.Sum256([]byte(req.CanvasID + "\x00" + system))
+	return canonicalAgentRequest{SystemPrompt: system, Messages: messages, Tools: cloudAgentTools(req), ToolChoice: "auto", PromptCacheKey: fmt.Sprintf("cloud-agent:%x", cacheHash[:24])}
 }
 func cloudAgentTools(req CloudAgentRequest) []map[string]any {
 	tools := []map[string]any{}

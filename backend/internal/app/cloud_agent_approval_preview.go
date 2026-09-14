@@ -54,7 +54,7 @@ type cloudAgentCanvasMutationPlan struct {
 func prepareCloudAgentCanvasMutation(repo *repository.Repository, userID, canvasID string, call cloudAgentCall) (*cloudAgentCanvasMutationPlan, error) {
 	var args agentCanvasArgs
 	if err := decodeCloudAgentJSONObject(call.Function.Arguments, &args); err != nil {
-		return nil, BadAuthRequest("画布工具参数必须是只含支持字段的单个JSON对象")
+		return nil, canvasArgumentError()
 	}
 	if len(args.Ops) < 1 || len(args.Ops) > 20 || args.SnapshotHash == "" {
 		return nil, BadAuthRequest("画布操作数量或快照无效")
