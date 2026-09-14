@@ -273,13 +273,17 @@ export function AgentToolCard({ title, text, detail, theme, references = [], onF
     const toolName = agentToolName(title, detail);
     const summary = friendlyAgentToolSummary(toolName, text, detail);
     const actions = agentCanvasActions(toolName, detail, references);
+    const visibleActions = actions.slice(0, 8);
+    const readNodeCount = toolName === "canvas_get_state" && !state.isError ? readCanvasNodeCount(detail) : 0;
+    const hiddenReadNodeCount = Math.max(0, readNodeCount - visibleActions.length);
     const conciseError = text.length > 180 ? `${text.slice(0, 180)}…` : text;
     return (
         <div data-agent-tool-card className="agent-tool-row flex min-w-0 flex-1 items-start gap-2 text-left" style={{ color: theme.node.text }}>
             <span className="agent-tool-status shrink-0" style={{ color: state.color }} aria-hidden="true">{state.icon}</span>
             <div className="min-w-0 flex-1 break-words text-xs leading-5" style={{ color: state.isError ? state.color : theme.node.muted }}>
                 {actions.length ? <div className="flex flex-col items-start gap-0.5">
-                    {actions.map((action) => <button key={`${action.action}-${action.nodeId}`} type="button" data-agent-node-id={action.nodeId} disabled={!onFocusNode} onClick={() => onFocusNode?.(action.nodeId)} aria-label={`在画布中定位${action.title}`} className="max-w-full cursor-pointer break-words rounded text-left underline decoration-dotted underline-offset-4 focus-visible:outline focus-visible:outline-2 disabled:cursor-default disabled:no-underline">{agentCanvasActionLabel(action)}</button>)}
+                    {visibleActions.map((action) => <button key={`${action.action}-${action.nodeId}`} type="button" data-agent-node-id={action.nodeId} disabled={!onFocusNode} onClick={() => onFocusNode?.(action.nodeId)} aria-label={`在画布中定位${action.title}`} className="max-w-full cursor-pointer break-words rounded text-left underline decoration-dotted underline-offset-4 focus-visible:outline focus-visible:outline-2 disabled:cursor-default disabled:no-underline">{agentCanvasActionLabel(action)}</button>)}
+                    {hiddenReadNodeCount > 0 ? <span className="pt-0.5 opacity-70">已读取 {readNodeCount} 个节点，已折叠其余 {hiddenReadNodeCount} 个</span> : null}
                 </div> : summary}
                 {state.isError && actions.length ? <span className="block">{summary}</span> : null}
                 {state.isError && text && text !== summary ? <span className="mt-0.5 block whitespace-pre-wrap break-words" style={{ color: theme.node.muted }}>{conciseError}</span> : null}
@@ -743,4 +747,10 @@ function agentToolName(title: string, detail?: unknown) {
 
 function objectField(value: unknown, key: string) {
     return value && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined;
+}
+
+function readCanvasNodeCount(detail: unknown) {
+    const result = objectField(detail, "result");
+    const nodes = objectField(result, "nodes");
+    return Array.isArray(nodes) ? nodes.length : 0;
 }
