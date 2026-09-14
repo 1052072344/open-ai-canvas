@@ -44,7 +44,6 @@ func cloudAgentSkillPaths(skill cloudAgentSkill) []string {
 
 func (s *Service) cloudAgentSkills(userID string, ids []string) ([]cloudAgentSkill, error) {
 	snapshots := []cloudAgentSkill{}
-	total := 0
 	for _, id := range ids {
 		skill, err := s.SkillDetail(userID, id)
 		if err != nil {
@@ -53,8 +52,9 @@ func (s *Service) cloudAgentSkills(userID string, ids []string) ([]cloudAgentSki
 		if !skill.IsAdded || skill.Status != 1 {
 			return nil, BadAuthRequest("只能使用用户技能库中已安装且启用的技能")
 		}
-		snapshot := cloudAgentSkill{ID: id, Name: skill.SkillName, Version: skill.VersionID, Hash: skill.ContentHash, Instruction: skill.Instruction, Files: map[string]string{}}
-		total += len(skill.Instruction)
+		// Skill content is loaded only after the model explicitly calls
+		// skill_read_file; keep the run context to stable metadata and paths.
+		snapshot := cloudAgentSkill{ID: id, Name: skill.SkillName, Version: skill.VersionID, Hash: skill.ContentHash, Files: map[string]string{cloudAgentSkillEntryPath: ""}}
 		files, err := s.SkillPackageFiles(userID, id)
 		if err != nil {
 			return nil, err
@@ -73,14 +73,7 @@ func (s *Service) cloudAgentSkills(userID string, ids []string) ([]cloudAgentSki
 			if !strings.HasSuffix(file.Path, ".md") && !strings.HasSuffix(file.Path, ".txt") && !strings.HasSuffix(file.Path, ".json") {
 				continue
 			}
-			content, err := s.SkillPackageFile(userID, id, file.Path)
-			if err != nil {
-				return nil, err
-			}
-			if !content.Binary {
-				snapshot.Files[file.Path] = content.Content
-				total += len(content.Content)
-			}
+			snapshot.Files[file.Path] = ""
 		}
 		// Detect an update during package reads instead of mixing two versions.
 		latest, err := s.SkillDetail(userID, id)
@@ -89,9 +82,6 @@ func (s *Service) cloudAgentSkills(userID string, ids []string) ([]cloudAgentSki
 		}
 		if latest.VersionID != skill.VersionID || latest.ContentHash != skill.ContentHash {
 			return nil, creationConflict("技能在读取时已更新，请重试")
-		}
-		if total > 128<<10 {
-			return nil, BadAuthRequest("本轮技能内容超过 128KB，请减少技能数量")
 		}
 		snapshots = append(snapshots, snapshot)
 	}
@@ -209,7 +199,11 @@ func cloudAgentToolAllowed(req CloudAgentRequest, name string) bool {
 }
 func cloudAgentWrite(name string) bool { return name == "canvas_apply_ops" || name == "generate_media" }
 
-func cloudAgentReadTool(repo *repository.Repository, userID string, state *cloudAgentRuntime, call cloudAgentCall) (any, error) {
+func cloudAgentReadTool(repo *repository.Repository, userID string, state *cloudAgentRuntime, call cloudAgentCall, services ...*Service) (any, error) {
+	var service *Service
+	if len(services) > 0 {
+		service = services[0]
+	}
 	switch call.Function.Name {
 	case "agent_profile_read":
 		var args struct {
@@ -278,10 +272,33 @@ func cloudAgentReadTool(repo *repository.Repository, userID string, state *cloud
 				if args.Path == "" {
 					return map[string]any{"version": skill.Version, "entryPath": cloudAgentSkillEntryPath, "files": cloudAgentSkillPaths(skill), "guidance": "先读取 SKILL.md，再只读取入口明确引用且当前任务需要的参考文件。只能读取 files 中列出的路径；不要重复列目录或猜测路径"}, nil
 				}
-				if args.Path == cloudAgentSkillEntryPath && strings.TrimSpace(skill.Instruction) != "" {
-					return map[string]any{"version": skill.Version, "path": cloudAgentSkillEntryPath, "content": skill.Instruction}, nil
+				if service != nil {
+					detail, err := service.SkillDetail(userID, skill.ID)
+					if err != nil {
+						return nil, err
+					}
+					if !detail.IsAdded || detail.Status != 1 || detail.VersionID != skill.Version || detail.ContentHash != skill.Hash {
+						return nil, creationConflict("技能已更新或不可用，请重试")
+					}
+					if args.Path == cloudAgentSkillEntryPath {
+						return map[string]any{"version": skill.Version, "path": args.Path, "content": detail.Instruction}, nil
+					}
+					if _, ok := skill.Files[args.Path]; !ok {
+						return nil, BadAuthRequest("参考文件未包含在本轮固定快照中")
+					}
+					file, err := service.SkillPackageFile(userID, skill.ID, args.Path)
+					if err != nil {
+						return nil, err
+					}
+					if file.Binary {
+						return nil, BadAuthRequest("不支持读取二进制技能文件")
+					}
+					return map[string]any{"version": skill.Version, "path": args.Path, "content": file.Content}, nil
 				}
-				if content, ok := skill.Files[args.Path]; ok {
+				if args.Path == cloudAgentSkillEntryPath && strings.TrimSpace(skill.Instruction) != "" {
+					return map[string]any{"version": skill.Version, "path": args.Path, "content": skill.Instruction}, nil
+				}
+				if content, ok := skill.Files[args.Path]; ok && content != "" {
 					return map[string]any{"version": skill.Version, "path": args.Path, "content": content}, nil
 				}
 				return nil, BadAuthRequest(fmt.Sprintf("参考文件未包含在本轮固定快照中；可读路径：%s。不要重试此路径", strings.Join(cloudAgentSkillPaths(skill), ", ")))

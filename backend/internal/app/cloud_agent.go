@@ -135,8 +135,8 @@ func validateCloudAgentRequest(req *CloudAgentRequest) error {
 	} else if req.Model != "" && req.Model != req.ChannelModelKey {
 		return BadAuthRequest("渠道模型标识与 model 不一致")
 	}
-	if len(req.SkillIDs) > 8 || req.Budget.MaxGenerationTasks < 0 || req.Budget.MaxGenerationTasks > 8 || req.Budget.MaxVideoSeconds < 0 || req.Budget.MaxVideoSeconds > 120 {
-		return BadAuthRequest("最多选择 8 个技能、8 个生成任务和 120 秒视频预算")
+	if req.Budget.MaxGenerationTasks < 0 || req.Budget.MaxVideoSeconds < 0 {
+		return BadAuthRequest("生成任务和视频秒数预算不能为负数")
 	}
 	seen := map[string]bool{}
 	for i, id := range req.SkillIDs {

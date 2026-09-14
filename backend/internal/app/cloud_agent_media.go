@@ -299,10 +299,10 @@ func validateCloudAgentMediaArgs(a cloudAgentMediaArgs, state *cloudAgentRuntime
 	if state == nil {
 		return BadAuthRequest("Agent 状态无效")
 	}
-	if state.Generations >= state.Request.Budget.MaxGenerationTasks {
+	if state.Request.Budget.MaxGenerationTasks > 0 && state.Generations >= state.Request.Budget.MaxGenerationTasks {
 		return BadAuthRequest("已达到本轮媒体生成次数上限")
 	}
-	if mode == "video" && state.VideoSeconds > state.Request.Budget.MaxVideoSeconds-a.Duration {
+	if mode == "video" && state.Request.Budget.MaxVideoSeconds > 0 && state.VideoSeconds > state.Request.Budget.MaxVideoSeconds-a.Duration {
 		return BadAuthRequest("已超过本轮视频时长预算")
 	}
 	return nil
