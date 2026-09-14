@@ -5,6 +5,15 @@ description: 当前项目已实现功能的手工验证清单与未确认边界
 
 # 待测试
 
+## 百炼多模态图像协议插件（dashscope-qwen-image）
+
+- 新增官方协议包 `plugin-packages/dashscope-qwen-image.yingce-plugin`，解决 `qwen-image-3.0-pro` / `wan2.7-image-pro` 无法调用的问题：这两个模型属于百炼多模态模型，走 OpenAI 图片端点会被网关判为“模型与端点不匹配”，官方错误码表现为 `url error, please check url`。
+- 协议形态：`POST /api/v1/services/aigc/image-generation/generation`（`X-DashScope-Async: enable`）+ 轮询 `GET /api/v1/tasks/{taskId}`；参考图放在 `input.messages[].content[].image`（优先 Base64 data URL），不使用 `/v1/images/edits` 的 multipart。
+- 已由单元测试覆盖：端点与异步头、文生图只发 text、图生图按 order 排序并优先 Base64、`size` 采用 DashScope 的星号格式且未登记档位省略、`enable_thinking` 固定 false、响应从 `output.choices[0].message.content[].image` 取图、上游失败保留错误信息。`go test ./internal/protocol/` 与 `go build ./...` 通过。
+- 待真实账号验收：用北京地域 Key 走一次文生图与一次图生图（换装），确认出图成功、参考图不报 url error。
+- 已知边界：协议用 `originPath` 声明请求路径，请求路径会替换渠道 Base URL 的路径段，因此渠道继续沿用 `.../compatible-mode/v1` 也能命中原生端点（`.../api/v1/services/...`）；只有域名需要正确。协议把 `size` 映射为 1024 级竖版/方形档位，未登记的档位会被省略并交由模型自动推荐（官方要求像素面积 512*512~2048*2048）。
+- 尚未处理：AI 模特页仍按“带参考图即走 `/images/edits`”的通用规则分支，未按协议能力判断；换成该插件后两阶段派生能否直接复用需实测确认。
+
 ## 云端 Agent 行为、能力和偏好分层（待真实环境验收）
 
 - [x] 系统/媒体行为资源由后端发布物加载，运行快照记录策略和能力版本/哈希；用户 → 项目 → 画布偏好经归属校验和独立 revision CAS，合并 revision 固定到新轮次，旧轮次保留原快照。system prompt 只注入偏好清单，正文由 `agent_profile_read` 从固定快照按层读取。工具 schema、节点类型、可写字段和画布读取来自服务端节点能力 registry；收费生成还需实际媒体任务适配器。写入、审批与预算仍以服务端强校验为准。

@@ -823,6 +823,54 @@ add({
   })
 });
 
+// Qwen-Image 3.0 / Wan 2.7 图像属于百炼多模态模型，必须走多模态端点：
+// 用 OpenAI 的 /v1/images/generations 或 /v1/images/edits 会被网关判为“模型与端点不匹配”，
+// 官方错误码把它表现为 url error；参考图只能放在 input.messages[].content[].image。
+// size 使用 DashScope 的 “宽*高”（星号），未登记的档位直接省略，由模型按提示词自动推荐分辨率。
+const dashscopeMultimodalImageSizes = [
+  ["1:1", "1024*1024"], ["3:4", "960*1280"], ["4:3", "1280*960"], ["2:3", "1024*1536"], ["3:2", "1536*1024"],
+  ["9:16", "864*1536"], ["16:9", "1536*864"],
+  ["1024x1024", "1024*1024"], ["1024x1536", "1024*1536"], ["1536x1024", "1536*1024"],
+  ["1024x1280", "1024*1280"], ["1280x1024", "1280*1024"], ["960x1280", "960*1280"], ["1280x960", "1280*960"]
+];
+
+add({
+  id: "dashscope-qwen-image", providerId: "dashscope-qwen-image", name: "DashScope Qwen / Wan Image", vendor: "Alibaba Cloud", capability: "image",
+  baseUrl: "https://dashscope.aliyuncs.com", auth: bearer, params: imageParams, requiresPublicMediaUrls: false,
+  notes: "百炼多模态图像端点（image-generation 异步任务）。文生图与图生图共用同一入口：不传 image 为文生图，传 1-3 张 image 为图生图。参考图通过 input.messages[].content[].image 传输（优先 Base64 data URL），不使用 OpenAI 的 /v1/images/edits multipart。size 采用“宽*高”，未登记的档位省略并由模型自动推荐；enable_thinking 固定为 false，因为官方要求非流式调用关闭思考模式。",
+  create: jsonCreate("/api/v1/services/aigc/image-generation/generation", {
+    model: ref("request.model"),
+    input: {
+      messages: [{
+        role: "user",
+        content: {
+          $concatArrays: [
+            map(sorted(ref("request.images")), "media", { image: coalesce(ref("media.dataUrl"), ref("media.url")) }),
+            [{ text: ref("request.prompt") }]
+          ]
+        }
+      }]
+    },
+    parameters: {
+      size: omit({ $switch: { cases: dashscopeMultimodalImageSizes.map(([ratio, size]) => ({ when: eq(ref("request.aspectRatio"), ratio), then: size })), default: null } }),
+      n: conditional(gt({ $toInt: ref("request.imageCount") }, 0), { $toInt: ref("request.imageCount") }, 1),
+      prompt_extend: true,
+      enable_thinking: false,
+      negative_prompt: omit(ref("request.providerOptions.dashscope-qwen-image.negative_prompt")),
+      seed: omit(ref("request.providerOptions.dashscope-qwen-image.seed")),
+      watermark: omit(ref("request.watermark"))
+    }
+  }, { headers: { "X-DashScope-Async": "enable" }, originPath: true }),
+  poll: { method: "GET", path: "/api/v1/tasks/{{taskId}}", originPath: true },
+  response: asyncResponse("image", {
+    taskId: coalesce(ref("response.output.task_id"), ref("response.task_id"), ref("taskId")),
+    status: coalesce(ref("response.output.task_status"), ref("response.status"), "pending"),
+    message: coalesce(ref("response.output.message"), ref("response.message")),
+    images: map(ref("response.output.choices.0.message.content"), "item", { url: omit(ref("item.image")) }),
+    errorPaths: ["code", "output.code"], messagePaths: ["message", "output.message"]
+  })
+});
+
 for (const [id, name, vendor, capability, baseUrl, createPath, pollPath, requestShape] of [
   ["dashscope-qwen-native", "DashScope Qwen Native", "Alibaba Cloud", "text", "https://dashscope.aliyuncs.com", "/api/v1/services/aigc/text-generation/generation", null, "input+parameters"],
   ["minimax-text-native", "MiniMax Text Native", "MiniMax", "text", "https://api.minimax.chat", "/v1/text/chatcompletion_v2", null, "messages+tokens_to_generate"],
