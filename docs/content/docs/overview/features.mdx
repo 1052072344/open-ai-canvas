@@ -28,6 +28,16 @@ description: 当前项目已实现的核心工作台能力与使用入口
 - `web/src/lib/canvas/tool-registry/definitions/selection-toolbar-tools.tsx`：多选悬浮栏默认工具。
 - `web/src/lib/canvas/canvas-layout.ts`：`spreadCanvasNodes` 按相对占位加大边距。
 
+## 图片节点多角度、宫格切分与多选框
+
+图片节点「多角度」使用贴在节点下方的 3D 编辑器（天空盒/摄像头、常用角度、方向箭头），拖动节点或平移画布时面板跟着走。宫格切分放在「图片工具」菜单的「拆分与标记」里，提供 4/9/16/25 预设和 5×5 自定义点选；自定义面板留在菜单内，切分后的子图按网格排开。框选多张图后拖动，虚线选框跟随被选节点。
+
+### 相关实现
+
+- `web/src/components/canvas/canvas-node-angle-dialog.tsx`、`web/src/components/canvas/canvas-angle-scene.tsx`：多角度面板与 3D 预览。
+- `web/src/components/canvas/canvas-grid-split-picker.tsx`、`web/src/lib/canvas/canvas-grid-split.ts`：宫格预设、自定义点选与切分子节点布局。
+- `web/src/lib/canvas/canvas-selection.ts`、`web/src/lib/canvas/canvas-live-viewport.ts`：多选虚线框随拖动预览平移。
+
 ## 系统渠道排序与前台别名
 
 后台系统渠道及渠道模型列表通过“设置排序”打开完整列表，支持拖动、上移和下移，点击“保存排序”统一生效；取消不会修改线上顺序。渠道行的“更多”菜单支持复制渠道，复制会生成独立的渠道、模型和价格档，并保留原连接配置与凭证。界面不显示内部排序数字，排序不受筛选及分页影响；并发修改会提示重新加载，避免覆盖其他管理员的调整。系统渠道模式下，用户端模型选择器沿用同一渠道及模型顺序。模型排序独立保存，不改变价格、能力版本或启用状态。
