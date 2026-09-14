@@ -72,6 +72,7 @@ import { CanvasDirectorNodePanel } from "@/components/canvas/director/canvas-dir
 import { CanvasVersionCompareModal } from "@/components/canvas/canvas-version-compare-modal";
 import { useFocusMode } from "@/hooks/use-focus-mode";
 import { connectCanvasTextMention } from "@/lib/canvas/canvas-text-mention";
+import { writeCanvasNodePrompt } from "@/lib/canvas/canvas-node-prompt";
 import {
     applyCanvasConnectionPromptSync,
     buildCanvasAgentMentionReferences,
@@ -81,7 +82,6 @@ import {
     normalizeCanvasNodeMentionTokens,
     reorderCanvasResourceConnections,
     replaceCanvasReferenceMentions,
-    writeCanvasNodePrompt,
     type CanvasResourceReference,
 } from "@/lib/canvas/canvas-resource-references";
 import { CanvasConnectionCreateMenu, CanvasNodePanelOverlay, type PendingConnectionCreate } from "@/components/canvas/canvas-workspace-overlays";
@@ -2521,7 +2521,7 @@ function InfiniteCanvasPage() {
                                 ) : null}
                             </div>
 
-                            <CanvasCloudAgentPanel canvasId={projectId} nodeCount={nodes.length} references={agentMentionReferences} open={assistantOpen} onOpen={openAgent} onCollapse={closeAgent} onFocusNode={(nodeId) => {
+                            <CanvasCloudAgentPanel canvasId={projectId} domainProjectId={currentProject?.projectId} nodeCount={nodes.length} references={agentMentionReferences} open={assistantOpen} onOpen={openAgent} onCollapse={closeAgent} onFocusNode={(nodeId) => {
                                 if (!nodesRef.current.some((node) => node.id === nodeId)) { message.info("该节点已删除或尚未同步到画布"); return; }
                                 focusCanvasNode(nodeId);
                             }} />

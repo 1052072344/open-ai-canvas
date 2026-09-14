@@ -14,6 +14,7 @@ import (
 	"gorm.io/gorm"
 	"infinite-canvas/backend/internal/kernel"
 	"infinite-canvas/backend/internal/model"
+	"infinite-canvas/backend/internal/prompts"
 	"infinite-canvas/backend/internal/repository"
 )
 
@@ -38,32 +39,37 @@ type cloudAgentCall struct {
 	} `json:"function"`
 }
 type cloudAgentApproval struct {
-	ModelName string         `json:"modelName,omitempty"`
-	ID        string         `json:"approvalId"`
-	Call      cloudAgentCall `json:"call"`
-	Decision  string         `json:"decision,omitempty"`
-	Reason    string         `json:"reason,omitempty"`
+	ModelName string                    `json:"modelName,omitempty"`
+	ID        string                    `json:"approvalId"`
+	Call      cloudAgentCall            `json:"call"`
+	CallHash  string                    `json:"callHash,omitempty"`
+	Preview   cloudAgentApprovalPreview `json:"preview"`
+	Decision  string                    `json:"decision,omitempty"`
+	Reason    string                    `json:"reason,omitempty"`
 }
 type cloudAgentRuntime struct {
-	Request         CloudAgentRequest     `json:"request"`
-	ParentID        string                `json:"parentId,omitempty"`
-	Fingerprint     string                `json:"fingerprint,omitempty"`
-	TextHistory     []providerTextMessage `json:"textHistory,omitempty"`
-	Skills          []cloudAgentSkill     `json:"skills"`
-	SkillReads      map[string]bool       `json:"skillReads,omitempty"`
-	Canonical       canonicalAgentRequest `json:"canonical"`
-	ActiveTaskID    string                `json:"activeTaskId"`
-	ActiveTextDraft string                `json:"activeTextDraft,omitempty"`
-	MediaTaskID     string                `json:"mediaTaskId,omitempty"`
-	TaskIDs         []string              `json:"taskIds"`
-	Step            int                   `json:"step"`
-	Generations     int                   `json:"generations"`
-	VideoSeconds    int                   `json:"videoSeconds"`
-	Calls           []cloudAgentCall      `json:"calls"`
-	CallIndex       int                   `json:"callIndex"`
-	Approval        *cloudAgentApproval   `json:"approval,omitempty"`
-	Decisions       map[string]string     `json:"decisions"`
-	Events          []CloudAgentEvent     `json:"events"`
+	Request         CloudAgentRequest         `json:"request"`
+	Policy          cloudAgentPolicySnapshot  `json:"policy"`
+	ParentID        string                    `json:"parentId,omitempty"`
+	Fingerprint     string                    `json:"fingerprint,omitempty"`
+	TextHistory     []providerTextMessage     `json:"textHistory,omitempty"`
+	Skills          []cloudAgentSkill         `json:"skills"`
+	SkillReads      map[string]bool           `json:"skillReads,omitempty"`
+	Profile         cloudAgentProfileSnapshot `json:"profile"`
+	ProfileReads    map[string]bool           `json:"profileReads,omitempty"`
+	Canonical       canonicalAgentRequest     `json:"canonical"`
+	ActiveTaskID    string                    `json:"activeTaskId"`
+	ActiveTextDraft string                    `json:"activeTextDraft,omitempty"`
+	MediaTaskID     string                    `json:"mediaTaskId,omitempty"`
+	TaskIDs         []string                  `json:"taskIds"`
+	Step            int                       `json:"step"`
+	Generations     int                       `json:"generations"`
+	VideoSeconds    int                       `json:"videoSeconds"`
+	Calls           []cloudAgentCall          `json:"calls"`
+	CallIndex       int                       `json:"callIndex"`
+	Approval        *cloudAgentApproval       `json:"approval,omitempty"`
+	Decisions       map[string]string         `json:"decisions"`
+	Events          []CloudAgentEvent         `json:"events"`
 }
 
 func (s *Service) ensureCloudAgentExecution(task *model.Task, initial cloudAgentState) error {
@@ -76,7 +82,7 @@ func (s *Service) ensureCloudAgentExecution(task *model.Task, initial cloudAgent
 	if err := json.Unmarshal([]byte(task.InputJSON), &input); err != nil {
 		return err
 	}
-	state := cloudAgentRuntime{Request: initial.Request, ParentID: initial.ParentID, Fingerprint: initial.Fingerprint, TextHistory: input.TextHistory, Skills: initial.Skills, Canonical: input.Requests.Canonical, ActiveTaskID: task.ID, TaskIDs: []string{task.ID}, Step: 1, Decisions: map[string]string{}, Events: []CloudAgentEvent{}}
+	state := cloudAgentRuntime{Request: initial.Request, Policy: initial.Policy, ParentID: initial.ParentID, Fingerprint: initial.Fingerprint, TextHistory: input.TextHistory, Skills: initial.Skills, Profile: initial.Profile, Canonical: input.Requests.Canonical, ActiveTaskID: task.ID, TaskIDs: []string{task.ID}, Step: 1, Decisions: map[string]string{}, Events: []CloudAgentEvent{}}
 	if len(initial.Skills) > 0 {
 		state.event(task.ID, "tool_completed", map[string]any{"toolName": "skills_load", "text": fmt.Sprintf("已从用户技能库固定加载 %d 个技能", len(initial.Skills))})
 	}
@@ -104,6 +110,21 @@ func cloudAgentDecode(run *model.CloudAgentExecution) (cloudAgentRuntime, error)
 	return state, nil
 }
 
+// cloudAgentDecodeForExecution is the only decoder for paths that may resume
+// model/tool execution. Historical reads intentionally use cloudAgentDecode:
+// a completed turn keeps its frozen policy and capability snapshot and remains
+// valid conversation context after the current runtime contract advances.
+func cloudAgentDecodeForExecution(run *model.CloudAgentExecution) (cloudAgentRuntime, error) {
+	state, err := cloudAgentDecode(run)
+	if err != nil {
+		return state, WrapAppError(409, "Agent 运行记录无法安全恢复；请新建一轮消息", err)
+	}
+	if err := validateCloudAgentPolicySnapshot(state.Policy); err != nil {
+		return state, WrapAppError(409, "Agent 运行使用旧版执行合同，无法继续原运行；请新建一轮消息", err)
+	}
+	return state, nil
+}
+
 func validateCloudAgentRuntime(run *model.CloudAgentExecution, state *cloudAgentRuntime) error {
 	if run == nil || state == nil {
 		return errors.New("Agent runtime state is missing")
@@ -113,16 +134,25 @@ func validateCloudAgentRuntime(run *model.CloudAgentExecution, state *cloudAgent
 		// execution identity. Durable rows are always validated below.
 		return nil
 	}
-	// A zero-value runtime is useful to exercise the skill reader in isolation.
-	// Persisted executions always have a database id, so keep the durable-state
-	// invariant strict without making those package-level helpers impossible to
-	// test independently.
-	if run.ID != "" && (state.Request.CanvasID == "" || state.Request.Prompt == "" || state.Request.PermissionMode == "") {
+	if state.Request.CanvasID == "" || state.Request.Prompt == "" || state.Request.PermissionMode == "" {
 		return errors.New("Agent runtime request is incomplete")
 	}
-	if run.ID != "" {
-		if err := validateCloudAgentRequest(&state.Request); err != nil {
-			return fmt.Errorf("invalid Agent runtime request: %w", err)
+	if err := validateCloudAgentRequest(&state.Request); err != nil {
+		return fmt.Errorf("invalid Agent runtime request: %w", err)
+	}
+	if err := validateCloudAgentPolicySnapshotStructure(state.Policy); err != nil {
+		return err
+	}
+	if err := validateCloudAgentProfileSnapshot(state.Profile, state.Policy); err != nil {
+		return err
+	}
+	for scope, read := range state.ProfileReads {
+		found := false
+		for _, layer := range state.Profile.Layers {
+			found = found || layer.Scope == scope
+		}
+		if !read || !found {
+			return errors.New("Agent runtime profile read history is invalid")
 		}
 	}
 	if state.Step < 0 || state.Step > cloudAgentMaxSteps+1 || state.Generations < 0 || state.VideoSeconds < 0 {
@@ -205,6 +235,87 @@ func validateCloudAgentRuntime(run *model.CloudAgentExecution, state *cloudAgent
 	return nil
 }
 
+func validateCloudAgentPolicySnapshot(snapshot cloudAgentPolicySnapshot) error {
+	if err := validateCloudAgentPolicySnapshotStructure(snapshot); err != nil {
+		return err
+	}
+	if snapshot.CompilerVersion != cloudAgentCompilerVersion {
+		return errors.New("Agent runtime policy compiler is unsupported")
+	}
+	if snapshot.CapabilitySetVersion != cloudAgentCapabilitySetVersion {
+		return errors.New("Agent runtime capability contract is unsupported")
+	}
+	if snapshot.ReasoningMode != "off" && snapshot.ReasoningMode != "auto" && snapshot.ReasoningMode != "deep" {
+		return errors.New("Agent runtime reasoning mode is invalid")
+	}
+	system, media, err := prompts.LoadAgentPolicies()
+	if err != nil {
+		return fmt.Errorf("load Agent runtime policies: %w", err)
+	}
+	if snapshot.SystemPolicyID != system.ID || snapshot.SystemPolicyVersion != system.Version || snapshot.MediaPolicyID != media.ID || snapshot.MediaPolicyVersion != media.Version {
+		return errors.New("Agent runtime policy version is unsupported")
+	}
+	// An existing run keeps its admitted prompt and tool schema. Never resume it
+	// against changed policies or capabilities under an unchanged version label.
+	if snapshot.SystemPolicyHash != system.Hash || snapshot.MediaPolicyHash != media.Hash || snapshot.CapabilitySetHash != cloudAgentCapabilitySetHash() {
+		return errors.New("Agent runtime policy or capability contract has changed")
+	}
+	return nil
+}
+
+// validateCloudAgentPolicySnapshotStructure validates the frozen historical
+// record without treating the current binary as its authorization source.
+// Version/hash equality with the current runtime is checked separately, only
+// when an old run is about to execute again.
+func validateCloudAgentPolicySnapshotStructure(snapshot cloudAgentPolicySnapshot) error {
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"policy compiler", snapshot.CompilerVersion},
+		{"system policy ID", snapshot.SystemPolicyID},
+		{"media policy ID", snapshot.MediaPolicyID},
+		{"capability set version", snapshot.CapabilitySetVersion},
+	} {
+		if strings.TrimSpace(field.value) == "" || !utf8.ValidString(field.value) || utf8.RuneCountInString(field.value) > 120 {
+			return fmt.Errorf("Agent runtime %s is invalid", field.name)
+		}
+	}
+	if snapshot.SystemPolicyVersion <= 0 || snapshot.MediaPolicyVersion <= 0 {
+		return errors.New("Agent runtime policy version is invalid")
+	}
+	if snapshot.ReasoningMode != "off" && snapshot.ReasoningMode != "auto" && snapshot.ReasoningMode != "deep" {
+		return errors.New("Agent runtime reasoning mode is invalid")
+	}
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"system policy hash", snapshot.SystemPolicyHash},
+		{"media policy hash", snapshot.MediaPolicyHash},
+		{"capability set hash", snapshot.CapabilitySetHash},
+		{"profile revision", snapshot.ProfileRevision},
+		{"profile hash", snapshot.ProfileHash},
+	} {
+		if !cloudAgentSHA256(field.value) {
+			return fmt.Errorf("Agent runtime %s is invalid", field.name)
+		}
+	}
+	return nil
+}
+
+func cloudAgentSHA256(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, r := range value {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
 func cloudAgentContainsString(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {
@@ -243,7 +354,7 @@ func (s *Service) cloudAgentExecutionOutput(task *model.Task, initial cloudAgent
 		// A terminal failed run must remain readable even if its durable runtime
 		// blob was damaged. Do not invent permissions or approval state; expose
 		// only the identity available from the original task input.
-		state = cloudAgentRuntime{Request: initial.Request, ParentID: initial.ParentID, Skills: initial.Skills, TaskIDs: []string{task.ID}, Events: []CloudAgentEvent{}}
+		state = cloudAgentRuntime{Request: initial.Request, ParentID: initial.ParentID, Skills: initial.Skills, Profile: initial.Profile, TaskIDs: []string{task.ID}, Events: []CloudAgentEvent{}}
 	}
 	out := agentRunOutput(task, initial)
 	out.Status = run.Status
@@ -354,8 +465,12 @@ func (s *Service) advanceCloudAgent(run *model.CloudAgentExecution) (err error) 
 	if run.Status != "running" && run.Status != "queued" {
 		return nil
 	}
-	state, err := cloudAgentDecode(run)
+	state, err := cloudAgentDecodeForExecution(run)
 	if err != nil {
+		var appErr *AppError
+		if errors.As(err, &appErr) && appErr != nil {
+			return s.terminateCloudAgent(run, appErr.Message)
+		}
 		return s.terminateCloudAgent(run, "Agent 运行状态损坏，本轮已停止")
 	}
 	if state.ActiveTaskID != "" {
@@ -443,7 +558,7 @@ func (s *Service) advanceCloudAgent(run *model.CloudAgentExecution) (err error) 
 	if state.Step >= cloudAgentMaxSteps {
 		return s.failCloudAgent(run, &state, "达到 8 次模型调用上限，本轮已停止")
 	}
-	input := map[string]any{"mode": "text", "prompt": state.Request.Prompt, "agentRequests": map[string]any{"canonical": state.Canonical}, "config": map[string]any{"channelId": state.Request.ChannelID, "channelModelKey": state.Request.ChannelModelKey, "model": firstNonEmpty(state.Request.ChannelModelKey, state.Request.Model)}, "textOptions": map[string]any{"stream": true, "thinking": state.Request.Thinking}}
+	input := map[string]any{"mode": "text", "prompt": state.Request.Prompt, "agentRequests": map[string]any{"canonical": state.Canonical}, "config": map[string]any{"channelId": state.Request.ChannelID, "channelModelKey": state.Request.ChannelModelKey, "model": firstNonEmpty(state.Request.ChannelModelKey, state.Request.Model)}, "textOptions": map[string]any{"stream": true, "thinking": cloudAgentReasoningEnabled(state.Policy.ReasoningMode)}}
 	raw, _ := json.Marshal(state.Canonical)
 	if len(raw) > 192<<10 {
 		return s.failCloudAgent(run, &state, "模型上下文超过 192KB 上限")
@@ -600,6 +715,9 @@ func (s *Service) advanceCloudAgentTool(run *model.CloudAgentExecution, state *c
 	if state.Approval != nil && state.Approval.Decision == "" {
 		return nil
 	}
+	if state.Approval != nil && state.Approval.Decision != "" && state.Approval.CallHash != "" && state.Approval.CallHash != cloudAgentApprovalCallHash(call) {
+		return s.terminateCloudAgent(run, "审批内容与待执行操作不一致，本轮已停止")
+	}
 	allowed := cloudAgentToolAllowed(state.Request, call.Function.Name)
 	if allowed && cloudAgentWrite(call.Function.Name) && (state.Request.PermissionMode == "request_approval" || call.Function.Name == "generate_media") && state.Approval == nil {
 		var plan *cloudAgentMediaPlan
@@ -627,6 +745,7 @@ func (s *Service) advanceCloudAgentTool(run *model.CloudAgentExecution, state *c
 		s.storageMu.Lock()
 		defer s.storageMu.Unlock()
 		return s.repo.MutateCloudAgent(run.UserID, run.ID, run.Revision, func(current *model.CloudAgentExecution, repo *repository.Repository) error {
+			var preview cloudAgentApprovalPreview
 			if plan != nil {
 				if err := createCloudAgentMediaNode(repo, run.UserID, state.Request.CanvasID, plan, nil, policy, cloudAgentCanvasEventRecorder(run.ID, state)); err != nil {
 					return err
@@ -646,10 +765,17 @@ func (s *Service) advanceCloudAgentTool(run *model.CloudAgentExecution, state *c
 				}
 				call.Function.Arguments = string(raw)
 				state.Calls[state.CallIndex] = call
+				preview = cloudAgentMediaApprovalPreview(plan, modelName)
+			} else {
+				canvasPlan, err := prepareCloudAgentCanvasMutation(repo, run.UserID, state.Request.CanvasID, call)
+				if err != nil {
+					return err
+				}
+				preview = canvasPlan.Preview
 			}
-			state.Approval = &cloudAgentApproval{ID: fmt.Sprintf("%s-%d-%d", run.ID, state.Step, state.CallIndex), Call: call, ModelName: modelName}
+			state.Approval = &cloudAgentApproval{ID: fmt.Sprintf("%s-%d-%d", run.ID, state.Step, state.CallIndex), Call: call, CallHash: cloudAgentApprovalCallHash(call), Preview: preview, ModelName: modelName}
 			current.Status = "waiting_approval"
-			state.event(run.ID, "approval_requested", map[string]any{"approvalId": state.Approval.ID, "toolName": call.Function.Name, "modelName": modelName, "arguments": json.RawMessage(call.Function.Arguments), "text": "请求执行 " + call.Function.Name})
+			state.event(run.ID, "approval_requested", map[string]any{"approvalId": state.Approval.ID, "toolName": call.Function.Name, "modelName": modelName, "arguments": json.RawMessage(call.Function.Arguments), "preview": preview, "text": preview.Description})
 			return cloudAgentSave(current, state)
 		})
 	}
@@ -843,7 +969,7 @@ func (s *Service) advanceCloudAgentMedia(run *model.CloudAgentExecution, state *
 				if readErr != nil {
 					return readErr
 				}
-				if err := emitCloudAgentCanvasChange(repo, run.ID, state, run.UserID, state.Request.CanvasID, before.PayloadJSON, "generate_media_complete"); err != nil {
+				if err := emitCloudAgentCanvasChange(repo, run.ID, state, cloudAgentMutationInput{UserID: run.UserID, CanvasID: state.Request.CanvasID, BeforeJSON: before.PayloadJSON, Operation: "generate_media_complete"}); err != nil {
 					return err
 				}
 			}
@@ -896,7 +1022,7 @@ func (s *Service) DecideCloudAgentApproval(userID, id, approvalID, decision, rea
 	if err != nil {
 		return err
 	}
-	state, err := cloudAgentDecode(run)
+	state, err := cloudAgentDecodeForExecution(run)
 	if err != nil {
 		return err
 	}

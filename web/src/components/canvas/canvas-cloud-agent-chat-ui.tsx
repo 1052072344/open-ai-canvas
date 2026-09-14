@@ -570,8 +570,8 @@ export function AgentChatComposer({
                         </div>
                     ) : null}
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-1">
+                <div className="agent-composer-toolbar mt-2">
+                    <div className="agent-composer-controls flex min-w-0 items-center gap-1">
                         {onAddFiles ? (
                             <>
                                 <input
@@ -600,7 +600,7 @@ export function AgentChatComposer({
                         ) : null}
                         {left}
                     </div>
-                    <div className="flex min-w-0 items-center gap-2">
+                    <div className="agent-composer-submit flex items-center gap-2">
                         <span className="agent-composer-send-hint">Enter 换行 · ⌘/Ctrl+Enter 发送</span>
                         <motion.button
                             type="button"
