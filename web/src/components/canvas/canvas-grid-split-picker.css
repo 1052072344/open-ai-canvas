@@ -1,7 +1,7 @@
 .canvas-node-toolbar-menu-split {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-1);
+    position: relative;
+    display: block;
+    overflow: visible;
 }
 
 .canvas-node-toolbar-menu-stack {
@@ -15,6 +15,34 @@
     border: 1px solid var(--workspace-overlay-border, var(--dock-border));
     border-radius: 8px;
     background: var(--workspace-overlay-bg-strong, var(--dock-surface));
+}
+
+/* 子面板脱离父菜单的布局流，避免打开二/三级菜单时 rc-trigger 重新测量
+   整个 popup，导致一级菜单向左跳动。 */
+.canvas-node-toolbar-menu-split > .canvas-grid-split-picker {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    left: calc(100% + var(--space-1));
+    transform-origin: top left;
+    animation: canvas-grid-split-picker-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes canvas-grid-split-picker-in {
+    from {
+        opacity: 0;
+        transform: translateX(-6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .canvas-node-toolbar-menu-split > .canvas-grid-split-picker {
+        animation: none;
+    }
 }
 
 .canvas-node-toolbar-menu-split .ant-dropdown-menu {
