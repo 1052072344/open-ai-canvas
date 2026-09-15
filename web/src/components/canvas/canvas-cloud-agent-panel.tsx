@@ -100,8 +100,8 @@ export function CanvasCloudAgentPanel({ canvasId, domainProjectId, nodeCount, re
     const installedSkills = useMemo(() => skills.filter((skill) => skill.isAdded), [skills]);
     const enabledSkills = useMemo(() => installedSkills.filter((skill) => selectedSkillIds.includes(skill.skillId)), [installedSkills, selectedSkillIds]);
     const status = run?.status || "idle";
-    const statusLabel = status === "waiting_approval" ? "等待审批" : status === "running" || status === "queued" ? "运行中" : status === "completed" ? "已完成" : status === "failed" ? "异常" : "待命";
-    const statusColor = status === "failed" ? "#e66b6b" : status === "waiting_approval" ? "#d6a24a" : status === "running" || status === "queued" ? "#69c29b" : theme.node.muted;
+    const statusLabel = status === "waiting_approval" ? "等待审批" : status === "running" || status === "queued" ? "运行中" : status === "completed" ? "已完成" : status === "failed" ? "异常" : status === "cancelled" ? "已停止" : status === "rejected" ? "已拒绝" : "待命";
+    const statusColor = status === "failed" ? "#e66b6b" : status === "rejected" || status === "cancelled" ? theme.node.muted : status === "waiting_approval" ? "#d6a24a" : status === "running" || status === "queued" ? "#69c29b" : theme.node.muted;
 
     useEffect(() => {
         if (!open || view !== "chat") setSkillsOpen(false);
@@ -447,7 +447,7 @@ export function CanvasCloudAgentPanel({ canvasId, domainProjectId, nodeCount, re
             await decideAgentApproval(runId, approvalId, decision, approval.reason, AbortSignal.timeout(15_000));
             if (currentScope.current === scope) {
                 setApproval((current) => current?.approvalId === approvalId ? null : current);
-                setRun((current) => current?.id === runId && current.status === "waiting_approval" && (!current.approval || current.approval.approvalId === approvalId) ? { ...current, status: "running", approval: undefined } : current);
+                setRun((current) => current?.id === runId && current.status === "waiting_approval" && (!current.approval || current.approval.approvalId === approvalId) ? { ...current, status: decision === "reject" ? "rejected" : "running", approval: undefined } : current);
             }
         } catch (cause) {
             if (currentScope.current !== scope) return;
@@ -1021,7 +1021,7 @@ function ApprovalCard({ approval, theme, submitting, onFocusNode, onReasonChange
 }
 
 function ApprovalPreviewItemView({ item, theme, onFocusNode }: { item: ReturnType<typeof agentApprovalPresentation>["items"][number]; theme: CanvasTheme; onFocusNode?: (nodeId: string) => void }) {
-    const operationLabel = item.operation === "add_node" ? "新增" : item.operation === "update_node" ? "修改" : item.operation === "connect_nodes" ? "连线" : "生成";
+    const operationLabel = item.operation === "add_node" ? "新增" : item.operation === "update_node" ? "修改" : item.operation === "connect_nodes" ? "连线" : item.operation === "create_storyboard" ? "创建分镜" : item.operation === "edit_storyboard" ? "修改分镜" : "生成";
     const renderNode = (title: string | undefined, id: string | undefined, typeLabel: string | undefined, role: "source" | "target" | "node") => {
         if (!title) return null;
         const content = <><span className="canvas-agent-approval-node-title">{title}</span>{typeLabel ? <span className="canvas-agent-approval-node-type">{typeLabel}</span> : null}</>;
@@ -1081,7 +1081,17 @@ function applyAgentEvent(event: AgentEvent, setMessages: Dispatch<SetStateAction
         }
         return;
     }
-    if (event.type === "approval_decided") { setApproval(null); return; }
+    if (event.type === "approval_decided") {
+        setApproval(null);
+        if (payload.decision === "reject") {
+            setMessages((current) => appendUniqueMessage(current, {
+                id: event.eventId,
+                role: "system",
+                text: text || "已拒绝本次操作，未写入画布。你可以告诉 Agent 修改方向后重新申请。",
+            }));
+        }
+        return;
+    }
     if (event.type === "progress_summary") {
         setMessages((current) => appendUniqueMessage(current, { id: event.eventId, role: "system", text: text || "Agent 正在整理执行计划" }));
         return;
