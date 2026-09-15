@@ -1131,12 +1131,97 @@ function applyAgentEvent(event: AgentEvent, setMessages: Dispatch<SetStateAction
         setMessages((current) => appendUniqueMessage(current, { id, role: "tool", title: "canvas_apply_ops", text: text || "画布操作已完成", detail: { ...payload, eventType: event.type } }));
         return;
     }
-    if (event.type.startsWith("tool_") || event.type === "generation_task_created") {
-        setMessages((current) => appendUniqueMessage(current, { id: event.eventId, role: "tool", title: String(payload.toolName || payload.title || "工具执行"), text: text || event.type, detail: { ...payload, eventType: event.type } }));
+    if (event.type === "generation_task_created") {
+        const message: CloudAgentChatMessage = { id: event.eventId, role: "tool", title: "generate_media", text: text || event.type, detail: { ...payload, eventType: event.type } };
+        setMessages((current) => upsertMediaToolTrace(current, message));
+        return;
+    }
+    if (event.type.startsWith("tool_")) {
+        const message: CloudAgentChatMessage = { id: event.eventId, role: "tool", title: String(payload.toolName || payload.title || "工具执行"), text: text || event.type, detail: { ...payload, eventType: event.type } };
+        if (payload.toolName === "generate_media") {
+            setMessages((current) => upsertMediaToolTrace(current, message));
+        } else {
+            setMessages((current) => appendUniqueMessage(current, message));
+        }
         return;
     }
     if (event.type === "run_failed" || event.type === "error") setMessages((current) => appendAgentError(current, event.eventId, text || "Agent 执行失败"));
 }
+function toolDetailRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function toolDetailNodeIds(detail: unknown): Set<string> {
+    const payload = toolDetailRecord(detail);
+    const ids = new Set<string>();
+    for (const value of [payload.nodeId, toolDetailRecord(payload.result).nodeId]) {
+        if (typeof value === "string" && value) ids.add(value);
+    }
+    if (Array.isArray(payload.actions)) {
+        for (const action of payload.actions) {
+            const nodeId = toolDetailRecord(action).nodeId;
+            if (typeof nodeId === "string" && nodeId) ids.add(nodeId);
+        }
+    }
+    if (typeof payload.arguments === "string") {
+        try {
+            const args = toolDetailRecord(JSON.parse(payload.arguments));
+            if (Array.isArray(args.ops)) {
+                for (const op of args.ops) {
+                    const nodeId = toolDetailRecord(op).id;
+                    if (typeof nodeId === "string" && nodeId) ids.add(nodeId);
+                }
+            }
+        } catch {
+            // Tool arguments are diagnostic data; a malformed value must not break the event feed.
+        }
+    }
+    return ids;
+}
+
+function toolDetailTaskIds(detail: unknown): Set<string> {
+    const payload = toolDetailRecord(detail);
+    const ids = new Set<string>();
+    for (const value of [payload.taskId, toolDetailRecord(payload.result).taskId]) {
+        if (typeof value === "string" && value) ids.add(value);
+    }
+    return ids;
+}
+
+function mergeToolDetails(previous: unknown, next: unknown): Record<string, unknown> {
+    const previousDetail = toolDetailRecord(previous);
+    const nextDetail = toolDetailRecord(next);
+    return {
+        ...previousDetail,
+        ...nextDetail,
+        actions: Array.isArray(nextDetail.actions) ? nextDetail.actions : previousDetail.actions,
+        arguments: nextDetail.arguments || previousDetail.arguments,
+    };
+}
+
+function upsertMediaToolTrace(current: CloudAgentChatMessage[], message: CloudAgentChatMessage): CloudAgentChatMessage[] {
+    const nextNodeIds = toolDetailNodeIds(message.detail);
+    const nextTaskIds = toolDetailTaskIds(message.detail);
+    const index = current.findIndex((item) => {
+        if (item.role !== "tool") return false;
+        const itemToolName = item.title || "";
+        if (itemToolName !== "canvas_apply_ops" && itemToolName !== "generate_media") return false;
+        const itemNodeIds = toolDetailNodeIds(item.detail);
+        const itemTaskIds = toolDetailTaskIds(item.detail);
+        return [...nextNodeIds].some((id) => itemNodeIds.has(id)) || [...nextTaskIds].some((id) => itemTaskIds.has(id));
+    });
+    if (index < 0) return appendUniqueMessage(current, message);
+    const next = [...current];
+    const previous = next[index];
+    next[index] = {
+        ...previous,
+        ...message,
+        id: previous.id,
+        detail: mergeToolDetails(previous.detail, message.detail),
+    };
+    return next;
+}
+
 function appendUniqueMessage(current: CloudAgentChatMessage[], message: CloudAgentChatMessage) {
     return current.some((item) => item.id === message.id) ? current : [...current, message];
 }
