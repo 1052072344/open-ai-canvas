@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
-import { Clapperboard, CloudDownload, Coins, CopyPlus, Focus, FolderKanban, Gauge, Home, LayoutGrid, LoaderCircle, Menu, Pencil, Plus, Redo2, Search, Share2, Trash2, Undo2, Upload } from "lucide-react";
+import { Clapperboard, CloudDownload, CloudUpload, Coins, CopyPlus, Focus, FolderKanban, Gauge, Home, LayoutGrid, LoaderCircle, Menu, Pencil, Plus, Redo2, Save, Search, Share2, Trash2, Undo2, Upload } from "lucide-react";
 import { Button, Dropdown, Tooltip } from "antd";
 
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
@@ -25,6 +25,8 @@ type CanvasTopBarProps = {
     canRedo: boolean;
     onCreateProject: () => void;
     onDeleteProject: () => void;
+    onSave: () => void | Promise<void>;
+    onForceSave: () => void;
     onImportImage: () => void;
     onImportLibTV: () => void;
     onImportTapNow: () => void;
@@ -52,6 +54,8 @@ export function CanvasTopBar({
     canRedo,
     onCreateProject,
     onDeleteProject,
+    onSave,
+    onForceSave,
     onImportImage,
     onImportLibTV,
     onImportTapNow,
@@ -105,6 +109,8 @@ export function CanvasTopBar({
                                     { type: "divider" },
                                     { key: "new", icon: <Plus className="size-4" />, label: "新建画布", onClick: onCreateProject },
                                     { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: "删除当前画布", onClick: onDeleteProject },
+                                    { key: "save", icon: <Save className="size-4" />, label: <MenuLabel text="保存" shortcut="⌘ S" />, onClick: () => void onSave() },
+                                    { key: "force-save", icon: <CloudUpload className="size-4" />, label: "强制覆盖保存", onClick: onForceSave },
                                     { type: "divider" },
                                     { key: "import", icon: <Upload className="size-4" />, label: "导入素材", onClick: onImportImage },
                                     { key: "search", icon: <Search className="size-4" />, label: <MenuLabel text="搜索节点" shortcut="⌘ F" />, onClick: onOpenSearch },
