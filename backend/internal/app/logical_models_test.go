@@ -26,6 +26,40 @@ func TestCapabilitySpecWithRoutePresetsRestoresImageSize(t *testing.T) {
 	}
 }
 
+func TestCapabilitySpecWithRoutePresetsUnionsTiersAcrossRoutes(t *testing.T) {
+	// 前台快照只带了单条线路的 1K 预设，其它线路提供 2K/4K：必须取并集，不能压成单档。
+	preset := func(size string, tier string, width int, height int) CapabilityImageSizePreset {
+		return CapabilityImageSizePreset{Size: size, Tier: tier, Ratio: "16:9", Width: width, Height: height}
+	}
+	product := CapabilitySpec{
+		Version:    1,
+		Capability: "image",
+		Options:    map[string]OptionConstraint{"size": {Values: []any{"16:9"}}},
+		ImageSize: &CapabilityImageSize{
+			Parameter: "aspect_ratio",
+			Presets:   []CapabilityImageSizePreset{preset("1824x1024", "1k", 1824, 1024)},
+		},
+	}
+	routes := []CapabilitySpec{
+		{Version: 1, Capability: "image", ImageSize: &CapabilityImageSize{Parameter: "aspect_ratio", Presets: []CapabilityImageSizePreset{preset("2752x1536", "2k", 2752, 1536)}}},
+		{Version: 1, Capability: "image", ImageSize: &CapabilityImageSize{Parameter: "aspect_ratio", Presets: []CapabilityImageSizePreset{preset("3840x2160", "4k", 3840, 2160)}}},
+	}
+
+	got := capabilitySpecWithRoutePresets(product, routes)
+	if got.ImageSize == nil {
+		t.Fatal("imageSize = nil")
+	}
+	tiers := make(map[string]bool, len(got.ImageSize.Presets))
+	for _, item := range got.ImageSize.Presets {
+		tiers[item.Tier] = true
+	}
+	for _, tier := range []string{"1k", "2k", "4k"} {
+		if !tiers[tier] {
+			t.Fatalf("tier %s missing: %#v", tier, got.ImageSize.Presets)
+		}
+	}
+}
+
 func TestMatchCapabilityRoutesTextImagesOnlyToDeclaredProfiles(t *testing.T) {
 	plainText := CapabilitySpec{
 		Version:    1,
