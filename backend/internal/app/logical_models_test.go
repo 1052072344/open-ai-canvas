@@ -60,6 +60,37 @@ func TestCapabilitySpecWithRoutePresetsUnionsTiersAcrossRoutes(t *testing.T) {
 	}
 }
 
+func TestEnabledLogicalRouteSpecsOmitsDisabledAndZeroWeightTiers(t *testing.T) {
+	preset := func(size string, tier string, width int, height int) CapabilityImageSizePreset {
+		return CapabilityImageSizePreset{Size: size, Tier: tier, Ratio: "16:9", Width: width, Height: height}
+	}
+	product := CapabilitySpec{
+		Version:    1,
+		Capability: "image",
+		ImageSize:  &CapabilityImageSize{Parameter: "aspect_ratio", Presets: []CapabilityImageSizePreset{preset("1824x1024", "1k", 1824, 1024)}},
+	}
+	routes := []cachedLogicalRoute{
+		{Route: model.LogicalModelRoute{Enabled: true, Weight: 1}, CapabilitySpec: CapabilitySpec{ImageSize: &CapabilityImageSize{Presets: []CapabilityImageSizePreset{preset("2752x1536", "2k", 2752, 1536)}}}},
+		{Route: model.LogicalModelRoute{Enabled: false, Weight: 1}, CapabilitySpec: CapabilitySpec{ImageSize: &CapabilityImageSize{Presets: []CapabilityImageSizePreset{preset("3840x2160", "4k", 3840, 2160)}}}},
+		{Route: model.LogicalModelRoute{Enabled: true, Weight: 0}, CapabilitySpec: CapabilitySpec{ImageSize: &CapabilityImageSize{Presets: []CapabilityImageSizePreset{preset("4096x2304", "4k", 4096, 2304)}}}},
+	}
+
+	got := capabilitySpecWithRoutePresets(product, enabledLogicalRouteSpecs(routes))
+	if got.ImageSize == nil {
+		t.Fatal("imageSize = nil")
+	}
+	tiers := make(map[string]bool, len(got.ImageSize.Presets))
+	for _, item := range got.ImageSize.Presets {
+		tiers[item.Tier] = true
+	}
+	if !tiers["1k"] || !tiers["2k"] {
+		t.Fatalf("expected 1k and 2k from enabled routes: %#v", got.ImageSize.Presets)
+	}
+	if tiers["4k"] {
+		t.Fatalf("disabled and zero-weight 4k routes must not appear in public presets: %#v", got.ImageSize.Presets)
+	}
+}
+
 func TestMatchCapabilityRoutesTextImagesOnlyToDeclaredProfiles(t *testing.T) {
 	plainText := CapabilitySpec{
 		Version:    1,

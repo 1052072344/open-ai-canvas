@@ -165,11 +165,7 @@ func (s *Service) PublicLogicalModels(intent *ModelRequestIntent) ([]PublicLogic
 
 func publicLogicalModel(cached cachedLogicalModel, available bool) PublicLogicalModel {
 	item := cached.Model
-	routeSpecs := make([]CapabilitySpec, 0, len(cached.Routes))
-	for _, route := range cached.Routes {
-		routeSpecs = append(routeSpecs, route.CapabilitySpec)
-	}
-	productSpec := capabilitySpecWithRoutePresets(cached.ProductSpec, routeSpecs)
+	productSpec := capabilitySpecWithRoutePresets(cached.ProductSpec, enabledLogicalRouteSpecs(cached.Routes))
 	profiles := make([]CapabilitySpec, 0, len(cached.Routes))
 	seen := make(map[string]bool, len(cached.Routes))
 	for _, route := range cached.Routes {
@@ -253,9 +249,22 @@ func normalizeLegacyModelIDs(values []string) []string {
 	return result
 }
 
+func enabledLogicalRouteSpecs(routes []cachedLogicalRoute) []CapabilitySpec {
+	specs := make([]CapabilitySpec, 0, len(routes))
+	for _, route := range routes {
+		if !route.Route.Enabled || route.Route.Weight <= 0 {
+			continue
+		}
+		specs = append(specs, route.CapabilitySpec)
+	}
+	return specs
+}
+
 // capabilitySpecWithRoutePresets repairs old front-model snapshots that stored
 // only `*` for a custom size. The wildcard remains for matching custom values,
 // while route presets are restored for admin and creator-side selectors.
+// Callers must pass only currently enabled routes; disabled or zero-weight
+// routes would otherwise advertise size tiers the public catalog cannot route.
 func capabilitySpecWithRoutePresets(spec CapabilitySpec, routes []CapabilitySpec) CapabilitySpec {
 	result := spec
 	result.Options = make(map[string]OptionConstraint, len(spec.Options))
