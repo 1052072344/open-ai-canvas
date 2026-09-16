@@ -280,23 +280,21 @@ func capabilitySpecWithRoutePresets(spec CapabilitySpec, routes []CapabilitySpec
 		}
 		result.Options[name] = OptionConstraint{Values: values}
 	}
-	if result.ImageSize == nil || result.ImageSize.Parameter == "" || len(result.ImageSize.Presets) == 0 {
-		if merged := mergeCapabilityImageSize(append([]CapabilitySpec{spec}, routes...)); merged != nil {
-			if result.ImageSize == nil {
-				result.ImageSize = merged
-			} else {
-				restored := *result.ImageSize
-				if restored.Parameter == "" {
-					restored.Parameter = merged.Parameter
-				}
-				if !restored.AllowCustom {
-					restored.AllowCustom = merged.AllowCustom
-				}
-				if len(restored.Presets) == 0 {
-					restored.Presets = merged.Presets
-				}
-				result.ImageSize = &restored
+	// 前台规格里的预设可能只来自单条线路的快照（后续新增的供应线路还没同步进来），
+	// 因此不管自身是否已有预设都要与各线路取并集，否则多档会被压成单档。
+	if merged := mergeCapabilityImageSize(append([]CapabilitySpec{spec}, routes...)); merged != nil {
+		if result.ImageSize == nil {
+			result.ImageSize = merged
+		} else {
+			restored := *result.ImageSize
+			if restored.Parameter == "" {
+				restored.Parameter = merged.Parameter
 			}
+			if !restored.AllowCustom {
+				restored.AllowCustom = merged.AllowCustom
+			}
+			restored.Presets = merged.Presets
+			result.ImageSize = &restored
 		}
 	}
 	return result
