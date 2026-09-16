@@ -166,15 +166,20 @@ export default function AssetsPage() {
         const start = (page - 1) * pageSize;
         return filteredAssets.slice(start, start + pageSize);
     }, [filteredAssets, page, pageSize]);
-    const visibleAssets = useMemo(
-        () => (assetPageQuery.data?.assets || localVisibleAssets).filter((asset): asset is LibraryAsset => asset.kind !== "entity"),
-        [assetPageQuery.data?.assets, localVisibleAssets],
-    );
+    // 远端成功且本页有可展示素材时用远端。真正的空结果保持空页。
+    // 仅在「远端空、本地仍有筛选结果」或「远端总数>0 但本页全是被排除的 entity」时回退本地。
+    const remotePageAssets = useMemo(() => (assetPageQuery.data?.assets || []).filter((asset): asset is LibraryAsset => asset.kind !== "entity"), [assetPageQuery.data?.assets]);
+    const remoteTotal = assetPageQuery.data?.total ?? 0;
+    const remoteReady = assetPageQuery.isSuccess && assetPageQuery.data !== undefined;
+    const preferLocalUnsynced = remoteReady && remoteTotal === 0 && localVisibleAssets.length > 0;
+    const remoteEntityOnlyPage = remoteReady && remotePageAssets.length === 0 && remoteTotal > 0;
+    const useRemotePage = remoteReady && !preferLocalUnsynced && !remoteEntityOnlyPage && (remotePageAssets.length > 0 || remoteTotal === 0);
+    const visibleAssets = useMemo(() => useRemotePage ? remotePageAssets : localVisibleAssets, [useRemotePage, remotePageAssets, localVisibleAssets]);
     const visibleAssetIds = useMemo(() => visibleAssets.map((asset) => asset.id), [visibleAssets]);
     const allFilteredSelected = visibleAssetIds.length > 0 && visibleAssetIds.every((id) => selectedIds.includes(id));
-    const totalAssets = assetPageQuery.data?.total ?? filteredAssets.length;
-    const kindCounts = useMemo(() => assetCountMap(kindOptions, assetPageQuery.data?.kindCounts, viewMode === "trash" ? trashAssets : activeAssets, (asset) => asset.kind), [activeAssets, assetPageQuery.data?.kindCounts, trashAssets, viewMode]);
-    const categoryCounts = useMemo(() => assetCountMap(categoryOptions, assetPageQuery.data?.categoryCounts, viewMode === "trash" ? trashAssets : activeAssets, (asset) => asset.category || "other"), [activeAssets, assetPageQuery.data?.categoryCounts, trashAssets, viewMode]);
+    const totalAssets = useRemotePage ? remoteTotal : filteredAssets.length;
+    const kindCounts = useMemo(() => assetCountMap(kindOptions, useRemotePage ? assetPageQuery.data?.kindCounts : undefined, viewMode === "trash" ? trashAssets : activeAssets, (asset) => asset.kind), [activeAssets, assetPageQuery.data?.kindCounts, trashAssets, useRemotePage, viewMode]);
+    const categoryCounts = useMemo(() => assetCountMap(categoryOptions, useRemotePage ? assetPageQuery.data?.categoryCounts : undefined, viewMode === "trash" ? trashAssets : activeAssets, (asset) => asset.category || "other"), [activeAssets, assetPageQuery.data?.categoryCounts, trashAssets, useRemotePage, viewMode]);
     const folderCounts = assetPageQuery.data?.folderCounts || {};
 
     useEffect(() => {
@@ -708,7 +713,7 @@ export default function AssetsPage() {
                                     onDelete={() => setBatchDeleteOpen(true)}
                                 />
                             ) : null}
-                            {validAssets.length === 0 ? (
+                            {validAssets.length === 0 && totalAssets === 0 ? (
                                 viewMode === "trash" ? (
                                     <WorkspaceState icon="assets" compact title="回收站是空的" description="删除画布或手动移入回收站的素材会暂存到这里，可在需要时随时还原。" />
                                 ) : (
@@ -716,7 +721,7 @@ export default function AssetsPage() {
                                 )
                             ) : (
                                 <>
-                                    {filteredAssets.length === 0 ? (
+                                    {visibleAssets.length === 0 ? (
                                         <WorkspaceState icon="assets" compact title="没有匹配的素材" description="调整关键词或左侧分类后再试。" />
                                     ) : (
                                         <CollectionGrid className="library-grid assets-library-grid" style={{ "--assets-grid-columns": gridDensity } as React.CSSProperties}>
@@ -1493,7 +1498,9 @@ function readAssetGridDensity(): AssetGridDensity {
 function assetCountMap<T extends { label: string; value: string }>(options: T[], remote: Record<string, number> | undefined, fallback: LibraryAsset[], valueOf: (asset: LibraryAsset) => string) {
     const result = new Map<string, number>();
     options.forEach((option) => {
-        if (remote) result.set(option.value, option.value === "all" ? Object.values(remote).reduce((sum, count) => sum + count, 0) : remote[option.value] || 0);
+        // 列表只展示 LibraryAsset（entity 角色卡被排除）；"全部"计数只能累加选项里声明的类型，
+        // 否则远端 facets 里的 entity 会计入"全部"，出现计数 30 但列表为空的矛盾。
+        if (remote) result.set(option.value, option.value === "all" ? options.reduce((sum, item) => item.value === "all" ? sum : sum + (remote[item.value] || 0), 0) : remote[option.value] || 0);
         else result.set(option.value, option.value === "all" ? fallback.length : fallback.filter((asset) => valueOf(asset) === option.value).length);
     });
     return result;
