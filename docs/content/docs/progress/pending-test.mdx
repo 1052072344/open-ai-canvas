@@ -138,6 +138,17 @@ description: 当前项目已实现功能的手工验证清单与未确认边界
 - 已知边界：协议用 `originPath` 声明请求路径，请求路径会替换渠道 Base URL 的路径段，因此渠道继续沿用 `.../compatible-mode/v1` 也能命中原生端点（`.../api/v1/services/...`）；只有域名需要正确。协议把 `size` 映射为 1024 级竖版/方形档位，未登记的档位会被省略并交由模型自动推荐（官方要求像素面积 512*512~2048*2048）。
 - 尚未处理：AI 模特页仍按“带参考图即走 `/images/edits`”的通用规则分支，未按协议能力判断；换成该插件后两阶段派生能否直接复用需实测确认。
 
+## Agnes 图像协议插件（agnes-image）
+
+- 新增官方协议包 `plugin-packages/agnes-image.yingce-plugin`，解决 Agnes 图片模型无法调用的问题：内置 OpenAI 图片路径会固定发送 `n`，并按渠道能力开关发送 `output_format` 与顶层 `response_format`，而 Agnes 的参数表没有这些字段，`POST /v1/images/generations` 直接返回 HTTP 400 `invalid_request`，上游原话为“output_format 不是文生图队列支持的字段”。`n` 无法通过任何开关摘除，因此必须独立协议。
+- 协议形态：同步 `POST /v1/images/generations`（`originPath`），文生图与图生图共用同一入口。`size` 必填，由统一层质量归一为 `1K`/`2K`/`3K`/`4K` 档位，`WxH` 像素尺寸原样透传；画面比例走独立的 `ratio` 字段；参考图放 `extra_body.image` 并优先 Base64 data URL，多图合成传多张，不使用 `/v1/images/edits` multipart；输出格式只能声明在 `extra_body.response_format`（默认 `url`，可用 `providerOptions.agnes-image.response_format` 覆盖为 `b64_json`）。
+- 前端能力默认值同步新增 `agnes-image` 分支：尺寸按“比例 + 1k/2k/4k 档位”选择，关闭上游不支持的 `output_format`、顶层 `response_format`、透明背景和蒙版编辑，`maxOutputs` 固定为 1（该端点不接受 `n`，单次请求固定返回一张）。官方另有 `3K` 档位，统一层只提供 1k/2k/4k 三档，故界面不露出。
+- 已由单元测试覆盖：逐项断言 `n`、`output_format`、`quality`、`background`、顶层 `response_format` 与顶层 `image` 均不出现在请求体中，参考图进 `extra_body.image` 且按 order 排序并优先 Base64，比例落档位 / 像素原样透传 / `auto` 与空值回落档位，不在官方比例表内的取值在校验阶段拒绝，响应同时读取 `data[0].url` 与 `data[0].b64_json`。`go test ./internal/protocol/`、`go build ./...`、`bun run typecheck` 与相关前端测试均通过。
+- 已完成真机验收（Agnes 中国站 Key，`agnes-image-2.1-flash` 与 `agnes-image-2.5-flash` 各一轮，AI 模特页）：母版与派生任务全部 `succeeded`，`portrait_role` 分别为 `anchor` 与 `derive` 并拿到 Agnes 的 `task_*` 号；调用日志里母版对应 `/images/t2i/...`、派生对应 `/images/i2i/...`，且两张派生图都被宿主成功下载。派生阶段能产出 i2i 结果，证明参考图确实经 `extra_body.image` 送达——内置 OpenAI 路径只会把参考图送去 Agnes 没有的 `/images/edits`，因此这条链路只可能由本插件完成。
+- 待验收：多图合成（单次传多张参考图）、`providerOptions.agnes-image.response_format=b64_json` 覆盖、以及 `size`/`ratio` 的实际取值。任务行只持久化 `mode` 与 `metadata`，调用日志也不记录请求体，因此档位与比例发出去的具体值无法从库中读回，需要抓包或在插件侧临时打印才能确认，目前只能由上游行为反推。
+- 渠道配置注意：模型协议改为本插件后必须重启后端，官方插件目录只在启动时装载；已保存过的 `capabilityConfig` 不会被新协议默认值覆盖，需要手动把尺寸参数改为 `aspect_ratio`、最大参考图设回大于 0，否则 AI 模特会退化为不带参考图的单阶段候选图。
+- 已知边界：默认输出 URL，由宿主立即下载并持久化；若上游图片地址无法公开回源，改用 `providerOptions.agnes-image.response_format=b64_json`。官方比例表只有 8 种，其他比例（如 `4:5`、`9:21`）在请求前即被拒绝，不会静默回落为 1:1。
+
 ## 云端 Agent 行为、能力和偏好分层（待真实环境验收）
 
 - [x] 系统/媒体行为资源由后端发布物加载，运行快照记录策略和能力版本/哈希；用户 → 项目 → 画布偏好经归属校验和独立 revision CAS，合并 revision 固定到新轮次，旧轮次保留原快照。system prompt 只注入偏好清单，正文由 `agent_profile_read` 从固定快照按层读取。工具 schema、节点类型、可写字段和画布读取来自服务端节点能力 registry；收费生成还需实际媒体任务适配器。写入、审批与预算仍以服务端强校验为准。
