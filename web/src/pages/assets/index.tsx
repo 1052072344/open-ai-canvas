@@ -1,3 +1,5 @@
+import { CollectionToolbar } from "@/components/layout/collection-toolbar";
+import { DeleteButton } from "@/components/ui/base/buttons/delete-button";
 import { AlertTriangle, AudioLines, Box, CheckCheck, Clapperboard, Copy, Download, FileText, FileUp, FolderOpen, FolderPlus, Image as ImageIcon, Images, LayoutGrid, Link2, Maximize2, MoreHorizontal, PencilLine, Play, Plus, RotateCcw, Search, Trash2, Upload, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -5,7 +7,7 @@ import { App, Button, Drawer, Dropdown, Form, Input, Modal, Popconfirm, Progress
 import type { MenuProps } from "antd";
 import { useNavigate } from "react-router";
 
-import { CollectionGrid, ListToolbar, PageHeader, PaginationBar, WorkspacePage } from "@/components/layout/workspace-page";
+import { CollectionGrid, PageHeader, PaginationBar, WorkspacePage } from "@/components/layout/workspace-page";
 import { WorkspaceState } from "@/components/layout/workspace-state";
 import { AssetMediaPreview } from "@/components/asset-media-preview";
 import { AssetLibraryCard, AssetLibraryCardMedia } from "@/components/assets/asset-library-card";
@@ -170,7 +172,6 @@ export default function AssetsPage() {
     );
     const visibleAssetIds = useMemo(() => visibleAssets.map((asset) => asset.id), [visibleAssets]);
     const allFilteredSelected = visibleAssetIds.length > 0 && visibleAssetIds.every((id) => selectedIds.includes(id));
-    const canCreateAsset = page === 1 && viewMode === "library" && !keyword.trim() && kindFilter === "all" && categoryFilter === "all" && folderFilter === "all";
     const totalAssets = assetPageQuery.data?.total ?? filteredAssets.length;
     const kindCounts = useMemo(() => assetCountMap(kindOptions, assetPageQuery.data?.kindCounts, viewMode === "trash" ? trashAssets : activeAssets, (asset) => asset.kind), [activeAssets, assetPageQuery.data?.kindCounts, trashAssets, viewMode]);
     const categoryCounts = useMemo(() => assetCountMap(categoryOptions, assetPageQuery.data?.categoryCounts, viewMode === "trash" ? trashAssets : activeAssets, (asset) => asset.category || "other"), [activeAssets, assetPageQuery.data?.categoryCounts, trashAssets, viewMode]);
@@ -233,6 +234,7 @@ export default function AssetsPage() {
             message.success(`已删除分类「${folder.name}」，其中素材已移至未分类`);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "素材分类删除失败");
+            throw error;
         }
     };
 
@@ -525,7 +527,7 @@ export default function AssetsPage() {
                     <PageHeader
                         title={viewMode === "trash" ? "素材库 / 回收站" : "素材库"}
                         description={viewMode === "trash" ? "已删除画布或手动归档的临时素材，可随时还原或彻底清理。" : "管理文本、图片、视频、音频和 3D 模型素材。"}
-                        meta={<span className="app-projects-header-meta assets-header-meta">{validAssets.length} 个素材</span>}
+                        meta={<span className="app-projects-header-meta assets-header-meta">{totalAssets} 个素材</span>}
                         actions={
                             <div className="assets-header-actions">
                                 <div className="assets-header-action-buttons">
@@ -558,26 +560,15 @@ export default function AssetsPage() {
                                         </>
                                     ) : (
                                         <>
-                                            <Button icon={<Plus className="size-3.5" />} onClick={openCreate}>
-                                                新增素材
-                                            </Button>
-                                            <Button icon={<Images className="size-3.5" />} onClick={() => setBatchUploadOpen(true)}>
-                                                批量上传图片
-                                            </Button>
-                                            <Button icon={<FolderOpen className="size-3.5" />} onClick={() => navigate("/plugins/eagle")}>
-                                                Eagle 素材库
-                                            </Button>
-                                            <Button aria-label="导出全部素材" title="导出全部素材" icon={<Download className="size-3.5" />} onClick={() => void exportAllAssets()} />
-                                            <Dropdown
-                                                trigger={["click"]}
-                                                menu={{
-                                                    items: [
-                                                        { key: "package", icon: <FileUp className="size-4" />, label: "导入素材包", onClick: () => assetInputRef.current?.click() },
-                                                        { key: "model", icon: <Upload className="size-4" />, label: "上传 3D 模型", onClick: () => modelInputRef.current?.click() },
-                                                    ],
-                                                }}
-                                            >
-                                                <Button aria-label="导入素材" title="导入素材" icon={<FileUp className="size-3.5" />} />
+                                            <Button type="primary" icon={<Plus />} onClick={openCreate}>新增素材</Button>
+                                            <Button icon={<Images />} onClick={() => setBatchUploadOpen(true)}>上传图片</Button>
+                                            <Dropdown trigger={["click"]} menu={{ items: [
+                                                { key: "eagle", icon: <FolderOpen />, label: "Eagle 素材库", onClick: () => navigate("/plugins/eagle") },
+                                                { key: "package", icon: <FileUp />, label: "导入素材包", onClick: () => assetInputRef.current?.click() },
+                                                { key: "model", icon: <Upload />, label: "上传 3D 模型", onClick: () => modelInputRef.current?.click() },
+                                                { key: "export", icon: <Download />, label: "导出全部素材", onClick: () => void exportAllAssets() },
+                                            ] }}>
+                                                <Button type="text" aria-label="更多素材操作" icon={<MoreHorizontal />} />
                                             </Dropdown>
                                         </>
                                     )}
@@ -586,9 +577,8 @@ export default function AssetsPage() {
                             </div>
                         }
                     />
-                    <ListToolbar
-                        className="library-toolbar"
-                        active={Boolean(keyword || kindFilter !== "all" || categoryFilter !== "all")}
+                    <CollectionToolbar
+                        active={Boolean(keyword || kindFilter !== "all" || categoryFilter !== "all" || folderFilter !== "all")}
                         onReset={() => {
                             setKeyword("");
                             setKindFilter("all");
@@ -609,27 +599,19 @@ export default function AssetsPage() {
                             }}
                             />
                             <Select
-                                value={folderFilter}
-                                className="w-full sm:w-44"
-                                options={[{ label: "全部自定义分类", value: "all" }, { label: "未分类", value: "uncategorized" }, ...folders.map((folder) => ({ label: folder.name, value: folder.id }))]}
-                                onChange={(value) => {
-                                    setFolderFilter(value as AssetFolderFilter);
-                                    setPage(1);
-                                }}
-                            />
-                            <Select
                                 value={gridDensity}
                                 className="w-full sm:w-32"
                                 suffixIcon={<LayoutGrid className="size-3.5" />}
-                                options={[{ label: "舒适 · 6 列", value: 6 }, { label: "标准 · 8 列", value: 8 }, { label: "紧凑 · 10 列", value: 10 }]}
+                                options={[{ label: "舒适", value: 6 }, { label: "标准", value: 8 }, { label: "紧凑", value: 10 }]}
                                 onChange={(value) => setGridDensity(value as AssetGridDensity)}
                             />
-                        </ListToolbar>
+                        </CollectionToolbar>
                 </div>
 
-                <div className="canvas-library-frame assets-library-frame">
-                    <div className="grid min-h-0 gap-4 lg:grid-cols-[176px_minmax(0,1fr)]">
-                        <aside className="thin-scrollbar flex gap-2 overflow-x-auto py-3 lg:sticky lg:top-0 lg:block lg:max-h-[calc(100vh-150px)] lg:overflow-y-auto lg:pr-3">
+                <div className="collection-content assets-collection-content">
+                    <div className="assets-collection-layout">
+                        <aside className="assets-collection-filters" aria-label="素材分类">
+                            <div className="assets-collection-filter-scroll">
                             <AssetFilterGroup
                                 title="素材类型"
                                 options={kindOptions}
@@ -651,15 +633,17 @@ export default function AssetsPage() {
                                     setCategoryFilter(value as AssetCategory | "all");
                                     setPage(1);
                                 }}
-                                className="lg:mt-5"
                             />
-                            <div className="mt-5">
-                                <div className="mb-1.5 flex items-center justify-between px-1 text-[var(--fs-tiny)] font-semibold uppercase tracking-[0.08em] text-foreground/38">
-                                    <span>我的分类</span>
+                            <section className="collection-filter-group assets-folder-filter">
+                                <div className="collection-folder-heading">
+                                    <span className="collection-filter-label">我的分类</span>
                                     <button type="button" className="assets-folder-add" title="新建分类" aria-label="新建分类" onClick={() => { setFolderName(""); setFolderEditor("new"); }}><FolderPlus className="size-3.5" /></button>
                                 </div>
-                                <div className="space-y-0.5">
-                                    <button type="button" aria-pressed={folderFilter === "uncategorized"} className={`assets-filter-item w-full ${folderFilter === "uncategorized" ? "is-active" : ""}`} onClick={() => { setFolderFilter("uncategorized"); setPage(1); }}>
+                                <div className="collection-folder-list">
+                                    <button type="button" aria-pressed={folderFilter === "all"} className={`assets-filter-item ${folderFilter === "all" ? "is-active" : ""}`} onClick={() => { setFolderFilter("all"); setPage(1); }}>
+                                        <span className="assets-filter-item-label">全部</span><span className="assets-filter-count">{activeAssets.length}</span>
+                                    </button>
+                                    <button type="button" aria-pressed={folderFilter === "uncategorized"} className={`assets-filter-item ${folderFilter === "uncategorized" ? "is-active" : ""}`} onClick={() => { setFolderFilter("uncategorized"); setPage(1); }}>
                                         <span className="assets-filter-item-label">未分类</span><span className="assets-filter-count">{folderCounts[""] ?? activeAssets.filter((asset) => !asset.folderId).length}</span>
                                     </button>
                                     {folders.map((folder) => (
@@ -667,15 +651,14 @@ export default function AssetsPage() {
                                             <button type="button" aria-pressed={folderFilter === folder.id} className={`assets-filter-item min-w-0 flex-1 ${folderFilter === folder.id ? "is-active" : ""}`} onClick={() => { setFolderFilter(folder.id); setPage(1); }}>
                                                 <span className="assets-filter-item-label min-w-0 truncate">{folder.name}</span><span className="assets-filter-count">{folderCounts[folder.id] ?? activeAssets.filter((asset) => asset.folderId === folder.id).length}</span>
                                             </button>
-                                            <Dropdown trigger={["click"]} menu={{ items: [{ key: "rename", icon: <PencilLine className="size-3.5" />, label: "重命名", onClick: () => { setFolderName(folder.name); setFolderEditor(folder); } }, { key: "delete", danger: true, icon: <Trash2 className="size-3.5" />, label: "删除分类", onClick: () => void removeFolder(folder) }] }}>
-                                                <button type="button" className="assets-folder-more" aria-label={`管理分类 ${folder.name}`} title="管理分类"><MoreHorizontal className="size-3.5" /></button>
-                                            </Dropdown>
+                                            <button type="button" className="product-icon-button" aria-label={`重命名分类 ${folder.name}`} onClick={() => { setFolderName(folder.name); setFolderEditor(folder); }}><PencilLine /></button>
+                                            <DeleteButton label={`删除分类 ${folder.name}`} description="分类删除后，其中的素材会移至未分类，素材文件会保留。" onConfirm={() => removeFolder(folder)} />
                                         </div>
                                     ))}
                                 </div>
+                            </section>
                             </div>
-                            <div className="mt-6 border-t border-border/40 pt-3">
-                                <div className="mb-1.5 px-1 text-[var(--fs-tiny)] font-semibold uppercase tracking-[0.08em] text-foreground/38">垃圾箱与归档</div>
+                            <div className="collection-trash-entry">
                                 <button
                                     type="button"
                                     aria-pressed={viewMode === "trash"}
@@ -737,15 +720,6 @@ export default function AssetsPage() {
                                         <WorkspaceState icon="assets" compact title="没有匹配的素材" description="调整关键词或左侧分类后再试。" />
                                     ) : (
                                         <CollectionGrid className="library-grid assets-library-grid" style={{ "--assets-grid-columns": gridDensity } as React.CSSProperties}>
-                                            {canCreateAsset ? (
-                                                <button type="button" className="library-create-card" onClick={openCreate}>
-                                                    <span className="library-create-cover">
-                                                        <Plus className="size-8" />
-                                                    </span>
-                                                    <span className="library-create-title">新增素材</span>
-                                                    <span className="library-create-meta">文本、图片、音视频或模型</span>
-                                                </button>
-                                            ) : null}
                                             {visibleAssets.map((asset) => (
                                                 <AssetCard
                                                     key={asset.id}
@@ -1086,12 +1060,12 @@ function AssetCard({
     return (
         <AssetLibraryCard selected={selected}>
             <AssetCover asset={asset} selected={selected} isTrash={isTrash} onSelect={onSelect} onOpen={onOpen} menuItems={menuItems} />
-            <button type="button" className="block w-full px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--workspace-accent)]" onClick={onOpen}>
+            <button type="button" className="asset-collection-body block w-full px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--workspace-accent)]" onClick={onOpen}>
                 <div className="flex min-w-0 items-center justify-between gap-2">
                     <h2 className="truncate text-[var(--fs-body)] font-semibold text-foreground" title={asset.title}>
                         {asset.title}
                     </h2>
-                    <span className="shrink-0 text-[var(--fs-tiny)] tabular-nums text-foreground/38">{formatAssetTime(asset.updatedAt)}</span>
+                    <span className="asset-collection-date shrink-0 tabular-nums">{formatAssetTime(asset.updatedAt)}</span>
                 </div>
                 {isTrash ? (
                     <div className="mt-1 flex items-center gap-1 text-[var(--fs-tiny)] font-medium text-amber-600 dark:text-amber-400" title={formatExpirationDate(asset.updatedAt, retentionDays)}>
@@ -1099,11 +1073,11 @@ function AssetCard({
                         <span>{formatExpirationHint(asset.updatedAt, retentionDays)}</span>
                     </div>
                 ) : (
-                    <div className="mt-1 truncate text-[var(--fs-label)] text-foreground/52" title={summary}>
+                    <div className="asset-collection-summary mt-1 truncate" title={summary}>
                         {summary}
                     </div>
                 )}
-                <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[var(--fs-tiny)] text-foreground/38">
+                <div className="asset-collection-source mt-1 flex min-w-0 items-center gap-1.5">
                     <span className="truncate">{asset.source || "未标注来源"}</span>
                     <span aria-hidden="true">·</span>
                     <span className="truncate">{assetProjectLabel(asset)}</span>
@@ -1323,9 +1297,9 @@ function AssetFilterGroup({
     className?: string;
 }) {
     return (
-        <div className={className}>
-            <div className="mb-1.5 px-1 text-[var(--fs-tiny)] font-semibold uppercase tracking-[0.08em] text-foreground/38">{title}</div>
-            <div className="flex gap-1.5 lg:block lg:space-y-0.5">
+        <div className={`collection-filter-group ${className}`}>
+            <span className="collection-filter-label">{title}</span>
+            <div className="collection-filter-options">
                 {options.map((option) => {
                     const active = value === option.value;
                     return (

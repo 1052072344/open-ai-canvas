@@ -8,7 +8,7 @@ import { canvasDockStyle } from "@/lib/canvas/canvas-aceternity-style";
 import type { CanvasContextSummary } from "@/lib/canvas/canvas-context-summary";
 import type { CanvasShortDramaProgress } from "@/lib/canvas/canvas-short-drama";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { useThemeStore } from "@/stores/use-theme-store";
+import { useCanvasThemeStore } from "@/stores/canvas/use-canvas-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { CanvasMediaPerformanceMode } from "@/types/canvas";
 import { CanvasShortcutsModal } from "./canvas-shortcuts-modal";
@@ -66,7 +66,7 @@ export function CanvasTopBar({
     onEnterFocusMode,
     shortDramaGuide,
 }: CanvasTopBarProps) {
-    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const theme = canvasThemes[useCanvasThemeStore((state) => state.theme)];
     const dockStyle = canvasDockStyle(theme, theme.node.text);
     const user = useUserStore((state) => state.user);
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
@@ -226,12 +226,12 @@ export function CanvasTopBar({
                         </Dropdown>
                     </CanvasTopBarTooltip>
                     {user && creditsEnabled ? (
-                        <CanvasTopBarTooltip label="查看积分明细">
+                        <CanvasTopBarTooltip label="进入积分超市">
                             <Link
                                 to="/wallet"
                                 className="canvas-topbar-action inline-flex h-9 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium tabular-nums"
                                 style={{ color: theme.node.text }}
-                                aria-label="查看积分明细"
+                                aria-label="进入积分超市"
                             >
                                 {refreshing && availableMicrocredits === null ? <LoaderCircle className="size-3.5 animate-spin opacity-60" style={{ color: theme.accent.primary }} /> : <Coins className="size-3.5" style={{ color: theme.accent.primary }} />}
                                 <span>{availableMicrocredits === null ? "--" : (availableMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 3 })}</span>
