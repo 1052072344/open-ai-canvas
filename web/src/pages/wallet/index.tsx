@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlipayCircleFilled, WechatFilled } from "@ant-design/icons";
-import { App, Button, Grid, Input, Modal, QRCode, Skeleton, Table, Tag } from "antd";
+import { App, Button, Grid, Input, Modal, QRCode, Skeleton, Table } from "antd";
+import { StatusBadge } from "@/components/ui/base/badges/status-badge";
 import { SegmentedControl } from "@/components/ui/base/segmented-control";
 import type { ColumnsType } from "antd/es/table";
 import { motion, useReducedMotion } from "motion/react";
@@ -612,26 +613,24 @@ function CreditDelta({ value }: { value: number }) {
 
 function LedgerTypeTag({ type }: { type: CreditLedgerEntry["type"] }) {
     const meta = ledgerTypeMeta(type);
-    return (
-        <Tag variant="filled" color={meta.tagColor}>
-            {meta.label}
-        </Tag>
-    );
+    // 用项目 StatusBadge 而不是 antd Tag：Tag 的 default/error 配色在本项目主题下不可读。
+    return <StatusBadge variant="filled" tone={meta.tone} label={meta.label} />;
 }
 
 function ledgerTypeMeta(type: CreditLedgerEntry["type"]) {
+    // tone 走 StatusBadge 的语义色，明暗主题都自适应；不再用 antd Tag 的 default 配色。
     const values = {
-        redeem: { label: "兑换充值", tagColor: "default", icon: <ArrowDownLeft className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" },
-        payment_topup: { label: "在线充值", tagColor: "success", icon: <CreditCard className="size-4" />, iconClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" },
-        admin_grant: { label: "管理员充值", tagColor: "default", icon: <ArrowDownLeft className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" },
-        consume: { label: "模型消费", tagColor: "error", icon: <Sparkles className="size-4" />, iconClass: "bg-rose-500/10 text-rose-600 dark:text-rose-300" },
-        reserve: { label: "积分冻结", tagColor: "warning", icon: <ArrowUpRight className="size-4" />, iconClass: "bg-amber-500/10 text-amber-600 dark:text-amber-300" },
-        refund: { label: "消费退款", tagColor: "warning", icon: <RotateCcw className="size-4" />, iconClass: "bg-amber-500/10 text-amber-600 dark:text-amber-300" },
-        admin_adjustment: { label: "管理员调账", tagColor: "default", icon: <SlidersHorizontal className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" },
-        signup_bonus: { label: "注册奖励", tagColor: "default", icon: <Sparkles className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" },
-        checkin_bonus: { label: "签到奖励", tagColor: "default", icon: <CalendarCheck className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" },
+        redeem: { label: "兑换充值", tone: "neutral", icon: <ArrowDownLeft className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" },
+        payment_topup: { label: "在线充值", tone: "success", icon: <CreditCard className="size-4" />, iconClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" },
+        admin_grant: { label: "管理员充值", tone: "neutral", icon: <ArrowDownLeft className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" },
+        consume: { label: "模型消费", tone: "error", icon: <Sparkles className="size-4" />, iconClass: "bg-rose-500/10 text-rose-600 dark:text-rose-300" },
+        reserve: { label: "积分冻结", tone: "warning", icon: <ArrowUpRight className="size-4" />, iconClass: "bg-amber-500/10 text-amber-600 dark:text-amber-300" },
+        refund: { label: "消费退款", tone: "warning", icon: <RotateCcw className="size-4" />, iconClass: "bg-amber-500/10 text-amber-600 dark:text-amber-300" },
+        admin_adjustment: { label: "管理员调账", tone: "neutral", icon: <SlidersHorizontal className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" },
+        signup_bonus: { label: "注册奖励", tone: "neutral", icon: <Sparkles className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" },
+        checkin_bonus: { label: "签到奖励", tone: "neutral", icon: <CalendarCheck className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" },
     } as const;
-    return values[type] || { label: "其他积分变动", tagColor: "default", icon: <ArrowUpRight className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" };
+    return values[type] || { label: "其他积分变动", tone: "neutral", icon: <ArrowUpRight className="size-4" />, iconClass: "bg-foreground/8 text-foreground/70" };
 }
 
 function ledgerTitle(entry: CreditLedgerEntry) {
