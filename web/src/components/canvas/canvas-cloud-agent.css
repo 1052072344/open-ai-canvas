@@ -3,6 +3,11 @@
     overscroll-behavior: contain;
 }
 
+/* Agent 浮窗高于普通画布层，模型菜单必须叠在对话窗之上。 */
+.agent-model-picker-popover {
+    z-index: calc(var(--z-modal-overlay) + 1000) !important;
+}
+
 /* Flex 子页必须允许收缩，长模型名和 Skill 文案不能决定窗口宽度。 */
 .canvas-agent-panel > div,
 .canvas-agent-settings,
