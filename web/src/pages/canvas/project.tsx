@@ -415,7 +415,7 @@ function InfiniteCanvasPage() {
         [cleanupAssetImages, getHistoryCleanupContext],
     );
 
-    const { loadError, retryLoad, addedSkills, agentCreatedNodes, clearCanvasFiles, createAndOpenProject, currentProject, deleteCurrentProject, renameCurrentProject, saveCanvasProject, updateProject } = useCanvasProjectLifecycle({
+    const { loadError, retryLoad, addedSkills, agentCreatedNodes, clearCanvasFiles, createAndOpenProject, currentProject, deleteCurrentProject, renameCurrentProject, saveCanvasProject, forceSaveCanvasProject, updateProject } = useCanvasProjectLifecycle({
         projectId,
         projectLoaded,
         nodes,
@@ -443,6 +443,18 @@ function InfiniteCanvasPage() {
         cleanupAssetImages,
         cleanupCanvasFiles,
     });
+
+    // 强制覆盖会改写云端版本并重绑媒体素材关联，必须让用户显式确认 destructive 语义。
+    const confirmForceSaveCanvas = useCallback(() => {
+        modal.confirm({
+            title: "用本地内容强制覆盖云端？",
+            content: "将把当前本地画布保存并覆盖云端版本，同时自动修复画布媒体与素材库的绑定（缺少素材记录时会按节点新建）。云端尚未同步到本地的改动会被覆盖。",
+            okText: "强制覆盖保存",
+            okButtonProps: { danger: true },
+            cancelText: "取消",
+            onOk: () => forceSaveCanvasProject(),
+        });
+    }, [forceSaveCanvasProject, modal]);
 
     const applyLibTVImport = useCallback(
         async (importedNodes: CanvasNodeData[], importedConnections: CanvasConnection[]) => {
@@ -2327,6 +2339,8 @@ function InfiniteCanvasPage() {
                                 canRedo={historyState.canRedo}
                                 onCreateProject={createAndOpenProject}
                                 onDeleteProject={deleteCurrentProject}
+                                onSave={() => void saveCanvasProject()}
+                                onForceSave={confirmForceSaveCanvas}
                                 onImportImage={() => handleUploadRequest()}
                                 onImportLibTV={() => setLibTVImportOpen(true)}
                                 onImportTapNow={() => setTapNowImportOpen(true)}
