@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { App, Button, Skeleton } from "antd";
-import { Switch } from "@/components/ui/base/switch";
+import { Switch } from "@/pages/admin/ui/controls";
 import { AlertTriangle, Clapperboard, Coins, ListChecks, MonitorCog, PlugZap, RadioTower, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
