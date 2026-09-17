@@ -61,7 +61,120 @@ func TestMigrateSchemaV15UpgradesExistingDatabase(t *testing.T) {
 		t.Fatal("v15 upgrade did not install Agent profile table and scope index")
 	}
 	status, err := ReadSchemaStatus(db)
-	if err != nil || !status.Ready || status.Current != 15 {
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
+		t.Fatalf("unexpected upgraded schema status: %+v, %v", status, err)
+	}
+}
+
+func TestMigrateSchemaV16UpgradesExistingDatabaseWithBannerAnnouncements(t *testing.T) {
+	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-banner-announcements-v16?mode=memory&cache=shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	if !db.Migrator().HasTable(&model.BannerAnnouncement{}) {
+		t.Fatal("v16 migration did not create banner_announcements table")
+	}
+	// 模拟旧库升级：删表 + 删除 v16 记录，重跑迁移应能重建。
+	if err := db.Migrator().DropTable(&model.BannerAnnouncement{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("version = ?", 16).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatalf("upgrade from v15: %v", err)
+	}
+	if !db.Migrator().HasTable(&model.BannerAnnouncement{}) {
+		t.Fatal("v16 upgrade did not reinstall banner_announcements table")
+	}
+	status, err := ReadSchemaStatus(db)
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
+		t.Fatalf("unexpected upgraded schema status: %+v, %v", status, err)
+	}
+}
+
+func TestMigrateSchemaV17AddsBannerAnnouncementTitleRuns(t *testing.T) {
+	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-banner-title-runs-v17?mode=memory&cache=shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	if !db.Migrator().HasColumn(&model.BannerAnnouncement{}, "title_runs") {
+		t.Fatal("v17 migration did not add banner_announcements.title_runs")
+	}
+	// 模拟 v16 旧库升级：先写入一条通知，删掉新列并移除 v17 记录，重跑迁移应补回列且保留原数据。
+	legacy := &model.BannerAnnouncement{ID: "legacy-banner", Title: "旧库通知", Status: "active"}
+	if err := db.Create(legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrator().DropColumn(&model.BannerAnnouncement{}, "title_runs"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("version = ?", 17).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatalf("upgrade from v16: %v", err)
+	}
+	if !db.Migrator().HasColumn(&model.BannerAnnouncement{}, "title_runs") {
+		t.Fatal("v17 upgrade did not restore banner_announcements.title_runs")
+	}
+	var stored model.BannerAnnouncement
+	if err := db.First(&stored, "id = ?", "legacy-banner").Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.Title != "旧库通知" {
+		t.Fatalf("legacy banner lost during upgrade: %+v", stored)
+	}
+	status, err := ReadSchemaStatus(db)
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
+		t.Fatalf("unexpected upgraded schema status: %+v, %v", status, err)
+	}
+}
+
+func TestMigrateSchemaV18AddsBannerAnnouncementNoticeType(t *testing.T) {
+	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-banner-notice-type-v18?mode=memory&cache=shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	if !db.Migrator().HasColumn(&model.BannerAnnouncement{}, "notice_type") {
+		t.Fatal("v18 migration did not add banner_announcements.notice_type")
+	}
+	// 模拟 v17 旧库升级：先写入一条通知，删掉新列并移除 v18 记录，重跑迁移应补回列且保留原数据。
+	legacy := &model.BannerAnnouncement{ID: "legacy-banner-v17", Title: "旧库通知", TitleRunsJSON: `[{"text":"旧库通知"}]`, Status: "active"}
+	if err := db.Create(legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrator().DropColumn(&model.BannerAnnouncement{}, "notice_type"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("version = ?", 18).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatalf("upgrade from v17: %v", err)
+	}
+	if !db.Migrator().HasColumn(&model.BannerAnnouncement{}, "notice_type") {
+		t.Fatal("v18 upgrade did not restore banner_announcements.notice_type")
+	}
+	var stored model.BannerAnnouncement
+	if err := db.First(&stored, "id = ?", "legacy-banner-v17").Error; err != nil {
+		t.Fatal(err)
+	}
+	// 新增列在旧行上为空，前端按默认类型与默认图标回落，因此只校验旧数据未丢失。
+	if stored.Title != "旧库通知" || stored.TitleRunsJSON != `[{"text":"旧库通知"}]` {
+		t.Fatalf("legacy banner lost during upgrade: %+v", stored)
+	}
+	status, err := ReadSchemaStatus(db)
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
 		t.Fatalf("unexpected upgraded schema status: %+v, %v", status, err)
 	}
 }

@@ -53,6 +53,17 @@
     --palette-status-loading: #2563eb;
     --palette-status-warning: #d97706;
 
+    /* 顶部常驻通知条主题色：按「通知类型」区分底色（类型定义见 lib/announcements/banner-notice）
+       两档取值都由白字对比度反推——light 档 ≥ 4.5:1（WCAG AA 正文），dark 档约 8.5:1（压暗避免刺眼）*/
+    --palette-banner-notice-500: #5c67e2; /* 公告 · 白字 4.67:1 */
+    --palette-banner-notice-700: #3f4590; /* 白字 8.52:1 */
+    --palette-banner-activity-500: #da2470; /* 活动 · 白字 4.70:1 */
+    --palette-banner-activity-700: #7b3552; /* 白字 8.49:1 */
+    --palette-banner-update-500: #138279; /* 更新 · 白字 4.67:1 */
+    --palette-banner-update-700: #235450; /* 白字 8.55:1 */
+    --palette-banner-warning-500: #b55b0c; /* 警告 · 白字 4.70:1 */
+    --palette-banner-warning-700: #6a4424; /* 白字 8.52:1 */
+
     /* --- 2. 间距（4px 栅格 + 半距）--- */
     --space-0: 0px;
     --space-half: 2px;
@@ -529,7 +540,10 @@
     --color-cn-stroke: var(--cn-stroke);
     --color-cn-fill: var(--cn-fill);
 
-    /* 字号（可用 text-fs-body / text-fs-caption 等）*/
+    /* 字号
+       注意：Tailwind v4 的字号命名空间是 --text-*，--font-size-* 不被识别，
+       因此下面这组声明不会生成 text-micro / text-caption 之类的工具类。
+       组件请沿用既有惯例直接引用 Primitive：text-[var(--fs-label)]、text-[var(--fs-caption)] 等。 */
     --font-size-micro: var(--fs-micro);
     --font-size-tiny: var(--fs-tiny);
     --font-size-label: var(--fs-label);
@@ -594,6 +608,15 @@
     --accent: var(--workspace-accent);
     --accent-soft: var(--workspace-accent-soft);
     --muted: var(--color-neutral-100);
+
+    /* 顶部常驻通知条（Layer 3 组件引用；文字恒为白）
+       四个 --notice-banner-surface-<type> 与通知类型一一对应，dark 覆盖见 .dark 语义覆盖区；
+       --notice-banner-surface 是「公告」的别名，供不区分类型的引用使用。*/
+    --notice-banner-surface-notice: var(--palette-banner-notice-500);
+    --notice-banner-surface-activity: var(--palette-banner-activity-500);
+    --notice-banner-surface-update: var(--palette-banner-update-500);
+    --notice-banner-surface-warning: var(--palette-banner-warning-500);
+    --notice-banner-surface: var(--notice-banner-surface-notice);
 
     /* Canvas Theme 语义（从 CSS 变量反序列化到 TS 主题对象，对应 #96 决策3）*/
     --cn-text: var(--color-neutral-950);
@@ -753,6 +776,13 @@
     --surface-hover: rgba(255, 255, 255, 0.07);
     --surface-active: rgba(255, 255, 255, 0.12);
     --muted: var(--color-neutral-900);
+
+    /* 顶部常驻通知条：暗色下四种类型统一压暗，白字对比度约 8.5:1 */
+    --notice-banner-surface-notice: var(--palette-banner-notice-700);
+    --notice-banner-surface-activity: var(--palette-banner-activity-700);
+    --notice-banner-surface-update: var(--palette-banner-update-700);
+    --notice-banner-surface-warning: var(--palette-banner-warning-700);
+    --notice-banner-surface: var(--notice-banner-surface-notice);
 
     /* composio 文字层级（dark 直取）*/
     --workspace-text-body: #a8a8a8;  /* body（tokens.json text/body）*/
