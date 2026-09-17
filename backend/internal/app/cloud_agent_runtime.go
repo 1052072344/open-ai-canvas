@@ -1196,15 +1196,14 @@ func (s *Service) advanceCloudAgentMedia(run *model.CloudAgentExecution, state *
 			if task.Status == model.TaskStatusSucceeded && writeErr == nil {
 				result["summary"] = "生成结果已回写画布节点"
 			}
-			// Keep the tool diagnostic as the last event for compatibility with
-			// consumers that render the completion result directly. The terminal
-			// run event is emitted first, so a failed completion still has an
-			// explicit run-level terminal signal without hiding the useful detail.
-			if task.Status != model.TaskStatusSucceeded || writeErr != nil {
+			// A billed generation failure is a tool result, not a dead run: the
+			// model must still be able to tell the user what happened. Only a
+			// canvas write that cannot land is terminal for the whole turn.
+			if writeErr != nil {
 				if current.Status != "cancelled" {
 					current.Status = "failed"
 				}
-				state.event(run.ID, "run_failed", map[string]any{"text": "媒体任务已提交，但结果处理失败；任务不会自动重试", "taskId": task.ID})
+				state.event(run.ID, "run_failed", map[string]any{"text": "媒体任务已提交，但结果无法回写画布；任务不会自动重试", "taskId": task.ID})
 			}
 			cloudAgentToolResult(run.ID, state, call, result, toolErr)
 			state.MediaTaskID = ""

@@ -122,4 +122,30 @@ func TestCloudAgentRefreshStepSnapshotHash(t *testing.T) {
 	if freshArgs.SnapshotHash != afterBind {
 		t.Fatalf("同源调用应被补到最新哈希：got %s want %s", truncateRunes(freshArgs.SnapshotHash, 12), truncateRunes(afterBind, 12))
 	}
+
+	empty := agentMediaCall(a)
+	var emptyArgs map[string]any
+	if err := json.Unmarshal([]byte(empty.Function.Arguments), &emptyArgs); err != nil {
+		t.Fatal(err)
+	}
+	delete(emptyArgs, "snapshotHash")
+	rawEmpty, _ := json.Marshal(emptyArgs)
+	empty.Function.Arguments = string(rawEmpty)
+	filled := s.cloudAgentRefreshStepSnapshotHash(run, &state, empty)
+	var filledArgs struct {
+		SnapshotHash string `json:"snapshotHash"`
+	}
+	if err := json.Unmarshal([]byte(filled.Function.Arguments), &filledArgs); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.First(&canvas, "id = ?", "agent-canvas").Error; err != nil {
+		t.Fatal(err)
+	}
+	currentDoc, err := creationDocument(canvas.PayloadJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filledArgs.SnapshotHash != cloudAgentMediaContentHash(currentDoc) {
+		t.Fatalf("漏传 snapshotHash 应补当前媒体快照：got %s", truncateRunes(filledArgs.SnapshotHash, 12))
+	}
 }
