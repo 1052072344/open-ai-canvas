@@ -83,13 +83,13 @@
 }
 
 [data-admin-root] .admin-nav-group + .admin-nav-group {
-    margin-top: 14px;
+    margin-top: 18px;
 }
 
 [data-admin-root] .admin-nav-group-label,
 [data-admin-root] .admin-nav-group-label span {
     display: block;
-    margin: 0 0 4px;
+    margin: 0 0 6px;
     padding: 0 8px;
     color: var(--admin-text-muted) !important;
     font-size: 11px;
@@ -113,6 +113,9 @@
 
 [data-admin-root] .admin-nav-group-items,
 [data-admin-root] .admin-nav-group-items:not(.is-collapsed) {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     margin-left: 0 !important;
     padding-left: 0 !important;
     border: 0 !important;

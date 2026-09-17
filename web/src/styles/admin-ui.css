@@ -1347,7 +1347,7 @@
 
 .admin-shell .admin-nav-group-label {
     display: block;
-    margin-bottom: 4px !important;
+    margin-bottom: 6px !important;
     padding-inline: 8px !important;
     color: var(--admin-text-muted) !important;
     font-size: 11px;
@@ -1584,10 +1584,14 @@
 }
 
 .admin-shell .admin-nav-group + .admin-nav-group {
-    margin-top: 14px;
+    margin-top: 18px;
 }
 
+.admin-shell .admin-nav-group-items,
 .admin-shell .admin-nav-group-items:not(.is-collapsed) {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     margin-left: 0;
     padding-left: 0;
     border-left: 0;
@@ -9634,7 +9638,7 @@
     }
 
     .admin-shell .admin-nav-group + .admin-nav-group {
-        margin-top: 16px;
+        margin-top: 20px;
     }
 
     .admin-shell .admin-sidebar-footer {
