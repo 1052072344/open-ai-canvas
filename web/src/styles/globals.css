@@ -17650,8 +17650,8 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     height: 28px;
     flex: 0 0 auto;
     border-radius: 8px;
-    background: #f3f2ff;
-    color: #6657d9;
+    background: var(--user-surface-muted);
+    color: var(--user-ink-muted);
 }
 
 .app-user-workspace .creation-empty-suggest .suggest-copy,
@@ -19304,7 +19304,7 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 .app-user-workspace .app-workspace-nav-link .app-workspace-nav-main { gap: 10px !important; }
 .app-user-workspace .app-workspace-nav-link .app-workspace-nav-icon svg,
 .app-user-workspace .app-workspace-nav-link .app-workspace-nav-main > svg { width: 16px !important; height: 16px !important; }
-.app-user-workspace .app-workspace-nav-link.is-active { background: var(--user-surface-muted) !important; color: var(--user-ink) !important; font-weight: 680 !important; }
+.app-user-workspace .app-workspace-nav-link.is-active { background: transparent !important; color: var(--user-ink) !important; font-weight: 680 !important; }
 .app-user-workspace .app-workspace-nav-link:hover:not(.is-active),
 .app-user-workspace .app-workspace-nav-link:focus-visible:not(.is-active) { background: var(--user-surface-hover) !important; color: var(--user-ink) !important; }
 .app-user-workspace .app-workspace-nav-group-toggle { color: var(--user-ink-soft) !important; }
@@ -19416,27 +19416,40 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 .app-user-workspace .creation-launchpad > .creation-mode-capsule .creation-chat-control svg { width: 16px !important; height: 16px !important; }
 
 .app-user-workspace .creation-empty-composer { width: 100% !important; margin: 0 0 20px !important; }
+.app-user-workspace .creation-composer-shell {
+    width: 100%;
+    border-radius: 22px;
+    background: transparent;
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--user-ink) 8%, transparent);
+}
+.dark .app-user-workspace .creation-composer-shell {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .28);
+}
 .app-user-workspace .creation-chat-composer {
     position: relative;
     isolation: isolate;
     overflow: hidden;
     border: 0 !important;
-    border-radius: 22px !important;
-    background:
-        radial-gradient(920px 180px at 8% -30%, color-mix(in srgb, var(--user-accent) 11%, transparent), transparent 58%),
-        var(--user-surface) !important;
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--user-ink) 8%, transparent) !important;
+    border-radius: 21px !important;
+    background: var(--user-surface) !important;
+    box-shadow: none !important;
     transition: box-shadow var(--user-motion), transform var(--user-motion) !important;
 }
+.app-user-workspace .creation-chat-composer .creation-composer-mode-row,
+.app-user-workspace .creation-chat-composer .creation-chat-writing-surface,
+.app-user-workspace .creation-chat-composer .creation-chat-dock {
+    position: relative;
+    z-index: 1;
+}
 .app-user-workspace .creation-chat-composer:focus-within {
-    box-shadow: 0 8px 18px color-mix(in srgb, var(--user-ink) 10%, transparent) !important;
+    box-shadow: none !important;
     transform: none;
 }
 .dark .app-user-workspace .creation-chat-composer {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, .28) !important;
+    box-shadow: none !important;
 }
 .dark .app-user-workspace .creation-chat-composer:focus-within {
-    box-shadow: 0 8px 18px rgba(0, 0, 0, .34) !important;
+    box-shadow: none !important;
 }
 .app-user-workspace .creation-chat-composer.is-empty .creation-chat-writing-surface {
     min-height: 216px !important;
@@ -19504,9 +19517,9 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 }
 .app-user-workspace .creation-launchpad .creation-reference-add-button {
     border-style: dashed;
-    border-color: color-mix(in srgb, var(--user-accent) 28%, var(--user-border));
-    background: color-mix(in srgb, var(--user-accent) 7%, var(--user-surface-muted));
-    color: var(--user-accent);
+    border-color: var(--user-border);
+    background: var(--user-surface-muted);
+    color: var(--user-ink-muted);
     font-size: 12px;
     transition: background var(--user-motion), border-color var(--user-motion), color var(--user-motion), transform var(--user-motion);
 }
@@ -19523,9 +19536,9 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-subheading small { color: var(--user-ink-soft); font-size: 10px; font-weight: 500; }
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand { display: flex; min-height: 58px; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: 13px; padding: 8px 10px; background: transparent; color: var(--user-ink); text-align: left; transition: background-color 160ms ease, border-color 160ms ease, transform 160ms cubic-bezier(.16,1,.3,1); }
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand:hover { border-color: var(--user-border); background: var(--user-surface-hover); transform: translateX(2px); }
-.app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 11px; background: linear-gradient(135deg, color-mix(in srgb, var(--user-accent) 20%, var(--user-surface)), color-mix(in srgb, var(--user-accent) 6%, var(--user-surface))); color: var(--user-accent); }
-.app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand:nth-child(3n) .canvas-model-picker-brand-icon { background: linear-gradient(135deg, color-mix(in srgb, #e99a3d 24%, var(--user-surface)), color-mix(in srgb, #e99a3d 7%, var(--user-surface))); color: #d57b16; }
-.app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand:nth-child(4n) .canvas-model-picker-brand-icon { background: linear-gradient(135deg, color-mix(in srgb, #41a87b 22%, var(--user-surface)), color-mix(in srgb, #41a87b 7%, var(--user-surface))); color: #25845d; }
+.app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 11px; background: var(--user-surface-muted); color: var(--user-ink-muted); }
+.app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand:nth-child(3n) .canvas-model-picker-brand-icon,
+.app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand:nth-child(4n) .canvas-model-picker-brand-icon { background: var(--user-surface-muted); color: var(--user-ink-muted); }
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand-copy { display: grid; min-width: 0; flex: 1; gap: 4px; }
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand-copy strong { overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-brand-copy small { color: var(--user-ink-muted); font-size: 10px; }
@@ -19538,9 +19551,9 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-secondary-head strong { color: var(--user-ink); font-size: 13px; }
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-secondary-head small { color: var(--user-ink-soft); font-size: 10px; }
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-option { min-height: 55px; border-radius: 12px; padding: 8px 9px; }
-.app-user-workspace .creation-model-picker-menu .canvas-model-picker-option > span:first-child > span:first-child { width: 32px; height: 32px; border-radius: 10px; background: color-mix(in srgb, var(--user-accent) 10%, var(--user-surface)) !important; color: var(--user-accent); }
-.app-user-workspace .creation-model-picker-menu .canvas-model-picker-option:nth-child(3n) > span:first-child > span:first-child { color: #d57b16; background: color-mix(in srgb, #e99a3d 12%, var(--user-surface)) !important; }
-.app-user-workspace .creation-model-picker-menu .canvas-model-picker-option:nth-child(4n) > span:first-child > span:first-child { color: #25845d; background: color-mix(in srgb, #41a87b 12%, var(--user-surface)) !important; }
+.app-user-workspace .creation-model-picker-menu .canvas-model-picker-option > span:first-child > span:first-child { width: 32px; height: 32px; border-radius: 10px; background: var(--user-surface-muted) !important; color: var(--user-ink-muted); }
+.app-user-workspace .creation-model-picker-menu .canvas-model-picker-option:nth-child(3n) > span:first-child > span:first-child,
+.app-user-workspace .creation-model-picker-menu .canvas-model-picker-option:nth-child(4n) > span:first-child > span:first-child { color: var(--user-ink-muted); background: var(--user-surface-muted) !important; }
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-option .text-amber-600,
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-option .dark\:text-amber-300 { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; background: color-mix(in srgb, #e28a17 12%, var(--user-surface)); color: #c66d00 !important; padding: 5px 8px; font-size: 11px; font-weight: 700; }
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-option .text-amber-600 svg { width: 13px; height: 13px; }
@@ -19561,6 +19574,8 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 }
 .app-user-workspace .creation-empty-suggest .creation-hero-prompt,
 .app-user-workspace .creation-empty-suggest .suggest-card {
+    position: relative;
+    isolation: isolate;
     min-height: 80px !important;
     margin: 0 !important;
     padding: 12px !important;
@@ -19571,12 +19586,22 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     color: var(--user-ink) !important;
     transition: transform var(--user-motion), background var(--user-motion), box-shadow var(--user-motion), border-color var(--user-motion) !important;
 }
+.app-user-workspace .creation-empty-suggest .suggest-card-hover {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background: var(--user-surface-hover);
+    pointer-events: none;
+}
+.app-user-workspace .creation-empty-suggest .suggest-card > .suggest-icon,
+.app-user-workspace .creation-empty-suggest .suggest-card > .suggest-copy { position: relative; z-index: 1; }
 .app-user-workspace .creation-empty-suggest .creation-hero-prompt { grid-column: auto !important; }
 .app-user-workspace .creation-empty-suggest .creation-hero-prompt:hover,
 .app-user-workspace .creation-empty-suggest .suggest-card:hover,
 .app-user-workspace .creation-empty-suggest .creation-hero-prompt:focus-visible,
-.app-user-workspace .creation-empty-suggest .suggest-card:focus-visible { transform: translateY(-2px) !important; border-color: var(--user-border-strong) !important; background: var(--user-surface-hover) !important; box-shadow: var(--user-shadow-hover) !important; }
-.app-user-workspace .creation-empty-suggest .suggest-icon { width: 32px !important; height: 32px !important; margin-bottom: 0 !important; flex-shrink: 0; border: 0 !important; border-radius: 12px !important; background: var(--user-accent-soft) !important; color: var(--user-accent) !important; }
+.app-user-workspace .creation-empty-suggest .suggest-card:focus-visible { transform: none !important; border-color: transparent !important; background: transparent !important; box-shadow: none !important; }
+.app-user-workspace .creation-empty-suggest .suggest-icon { width: 32px !important; height: 32px !important; margin-bottom: 0 !important; flex-shrink: 0; border: 0 !important; border-radius: 12px !important; background: var(--user-surface-muted) !important; color: var(--user-ink-muted) !important; }
 .app-user-workspace .creation-empty-suggest .suggest-copy,
 .app-user-workspace .creation-empty-suggest .creation-hero-prompt-copy { gap: 4px !important; }
 .app-user-workspace .creation-empty-suggest .suggest-copy strong,
