@@ -5,6 +5,14 @@ description: 当前项目已实现功能的手工验证清单与未确认边界
 
 # 待测试
 
+## Agent Plan Seedream 误走可信素材（2026-09-17）
+
+根因：`isArkPlanVideoConfig` / 前端 `usesArkVideoAssetReference` 仅按 Base URL 含 `/api/plan/v3` 判断，Agent Plan Seedream 与 Seedance 共用该路径，图片生成被误判为视频可信素材路径，自动 CreateAsset 并把参考图改成 `asset://`，上游图片接口拒绝。修复：后端仅 `mode=video` 且非图片协议时同步可信素材；前端仅视频 mode + 视频协议（或非图片协议的 Plan BaseURL）才提交 `asset://`。后端单测已覆盖。需浏览器验收：
+
+- [ ] Agent Plan Seedream / 任意 Base URL 为 `/api/plan/v3` 的图片渠道带参考图生成：任务进度无「同步方舟可信素材」，请求 `image` 为公网 URL 或 data URL，不是 `asset://`。
+- [ ] 同一张已录入方舟素材 ID 的参考图用于 Agent Plan / 方舟 Seedance 视频生成时，仍可走 `asset://` 并跳过重复上传。
+- [ ] 官方 `volcengine-ark-image` / `volcengine-ark-video` 行为不变。
+
 ## 画布节点快速引用 Agent
 
 - 多选节点后，选区浮动工具栏应显示 `@` 图标；点击「发送到 Agent」后，Agent 输入框应自动带入所有选中节点引用。
