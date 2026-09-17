@@ -1306,7 +1306,8 @@
     }
 
     /* 全局轻量通知与消息提示框 */
-    .ant-message-notice .ant-message-notice-content {
+    .ant-message-notice .ant-message-notice-content,
+    :where(.dark, [data-theme="dark"]) .ant-message-notice .ant-message-notice-content {
         color: var(--foreground) !important;
         background: var(--color-surface, var(--workspace-overlay-bg-strong, #ffffff)) !important;
         border: 1px solid var(--color-border, var(--workspace-overlay-border, rgba(0, 0, 0, 0.12))) !important;
@@ -1314,11 +1315,19 @@
     }
 
     .dark .ant-message-notice .ant-message-notice-content,
-    .dark body .ant-message-notice-content {
+    .dark body .ant-message-notice-content,
+    [data-theme="dark"] .ant-message-notice .ant-message-notice-content,
+    .dark .ant-message-custom-content,
+    .dark .ant-message-notice {
         color: #f4f4f5 !important;
         background: #1e1e20 !important;
         border-color: rgba(255, 255, 255, 0.16) !important;
         box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55) !important;
+    }
+
+    .dark .ant-message-notice-content span,
+    .dark .ant-message-custom-content span {
+        color: #f4f4f5 !important;
     }
 
     .ant-notification-notice {
