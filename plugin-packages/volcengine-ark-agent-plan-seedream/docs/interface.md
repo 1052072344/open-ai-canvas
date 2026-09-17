@@ -1,13 +1,13 @@
-# Volcengine Ark Seedream Images 接口字段
+# Volcengine Ark Agent Plan Seedream Images 接口字段
 
 ## 协议身份
 
-- 插件 ID：`volcengine-ark-seedream`。
-- Provider ID：`volcengine-ark-image`。
+- 插件 ID：`volcengine-ark-agent-plan-seedream`。
+- Provider ID：`volcengine-ark-agent-plan-image`。
 - 能力：`image`。
 - 默认 Base URL：`https://ark.cn-beijing.volces.com`。
 - 鉴权驱动：`bearer`。
-- 创建：`POST /api/v3/images/generations`。
+- 创建：`POST /api/plan/v3/images/generations`。
 - 生命周期：同步响应。
 
 ## 配置字段
@@ -36,25 +36,25 @@
 | 上游位置 | 值或转换表达式 |
 | --- | --- |
 | `create.method` | `"POST"` |
-| `create.path` | `"/api/v3/images/generations"` |
+| `create.path` | `"/api/plan/v3/images/generations"` |
 | `create.contentType` | `"application/json"` |
 | `create.body.model` | `{"$ref":"request.model"}` |
 | `create.body.prompt` | `{"$ref":"request.prompt"}` |
 | `create.body.size` | `{"$omitEmpty":{"$switch":{"cases":[{"when":{"$eq":[{"$ref":"request.aspectRatio"},"auto"]},"then":"2k"},{"when":{"$eq":[{"$ref":"request.aspectRatio"},"1:1"]},"then":"2048x2048"},{"when":{"$eq":[{"$ref":"request.aspectRatio"},"4:3"]},"then":"2304x1728"},{"when":{"$eq":[{"$ref":"request.aspectRatio"},"3:4"]},"then":"1728x2304"},{"when":{"$eq":[{"$ref":"request.aspectRatio"},"16:9"]},"then":"2560x1440"},{"when":{"$eq":[{"$ref":"request.aspectRatio"},"9:16"]},"then":"1440x2560"},{"when":{"$eq":[{"$ref":"request.aspectRatio"},"3:2"]},"then":"2496x1664"},{"when":{"$eq":[{"$ref":"request.aspectRatio"},"2:3"]},"then":"1664x2496"},{"when":{"$eq":[{"$ref":"request.aspectRatio"},"21:9"]},"then":"3024x1296"}],"default":{"$ref":"request.aspectRatio"}}}}` |
 | `create.body.image` | `{"$omitEmpty":{"$if":{"condition":{"$eq":[{"$len":{"$ref":"request.images"}},1]},"then":{"$first":{"$map":{"from":{"$ref":"request.images"},"as":"media","in":{"$ref":"media.value"}}}},"else":{"$if":{"condition":{"$gt":[{"$len":{"$ref":"request.images"}},1]},"then":{"$map":{"from":{"$ref":"request.images"},"as":"media","in":{"$ref":"media.value"}}},"else":null}}}}}` |
-| `create.body.sequential_image_generation` | `{"$omitEmpty":{"$ref":"request.providerOptions.volcengine-ark-image.sequential_image_generation"}}` |
-| `create.body.sequential_image_generation_options` | `{"$omitEmpty":{"$ref":"request.providerOptions.volcengine-ark-image.sequential_image_generation_options"}}` |
-| `create.body.watermark` | `{"$coalesce":[{"$ref":"request.providerOptions.volcengine-ark-image.watermark"},{"$ref":"request.watermark"},false]}` |
-| `create.body.seed` | `{"$omitEmpty":{"$ref":"request.providerOptions.volcengine-ark-image.seed"}}` |
-| `create.body.response_format` | `{"$coalesce":[{"$ref":"request.providerOptions.volcengine-ark-image.response_format"},"b64_json"]}` |
+| `create.body.sequential_image_generation` | `{"$omitEmpty":{"$ref":"request.providerOptions.volcengine-ark-agent-plan-image.sequential_image_generation"}}` |
+| `create.body.sequential_image_generation_options` | `{"$omitEmpty":{"$ref":"request.providerOptions.volcengine-ark-agent-plan-image.sequential_image_generation_options"}}` |
+| `create.body.watermark` | `{"$coalesce":[{"$ref":"request.providerOptions.volcengine-ark-agent-plan-image.watermark"},{"$ref":"request.watermark"},false]}` |
+| `create.body.seed` | `{"$omitEmpty":{"$ref":"request.providerOptions.volcengine-ark-agent-plan-image.seed"}}` |
+| `create.body.response_format` | `{"$coalesce":[{"$ref":"request.providerOptions.volcengine-ark-agent-plan-image.response_format"},"b64_json"]}` |
 
 ## Provider 扩展键
 
-- `providerOptions.volcengine-ark-image.response_format`
-- `providerOptions.volcengine-ark-image.seed`
-- `providerOptions.volcengine-ark-image.sequential_image_generation`
-- `providerOptions.volcengine-ark-image.sequential_image_generation_options`
-- `providerOptions.volcengine-ark-image.watermark`
+- `providerOptions.volcengine-ark-agent-plan-image.response_format`
+- `providerOptions.volcengine-ark-agent-plan-image.seed`
+- `providerOptions.volcengine-ark-agent-plan-image.sequential_image_generation`
+- `providerOptions.volcengine-ark-agent-plan-image.sequential_image_generation_options`
+- `providerOptions.volcengine-ark-agent-plan-image.watermark`
 
 动态模型或工作流允许使用文档声明的完整 `parameters/input/extra_body` 对象；该对象是协议本身的开放 schema，不会被宿主裁剪。
 
@@ -74,7 +74,7 @@
 
 ## 兼容边界
 
-官方 Ark 推理接入：Base URL 使用 /api/v3，API Key 来自方舟推理接入控制台，不可与 Agent Plan 专属 Key 混用。
+Agent Plan 专属接入：请求路径为 /api/plan/v3/images/generations，必须使用 Agent Plan 控制台专属 API Key；请求体与官方 Seedream 协议一致，但凭证与额度按 AFP 套餐结算，不能与 /api/v3 官方 Key 混用。
 
 <!-- YINGCE_MANIFEST_CONTRACT_START -->
 ## Manifest 完整接口定义
@@ -84,11 +84,11 @@
 ```json
 {
   "apiVersion": "yingce.plugin/v2",
-  "id": "volcengine-ark-seedream",
-  "name": "Volcengine Ark Seedream Images",
+  "id": "volcengine-ark-agent-plan-seedream",
+  "name": "Volcengine Ark Agent Plan Seedream Images",
   "version": "2.0.0",
   "author": "Volcengine / 影策",
-  "description": "Volcengine Ark Seedream Images 独立请求协议插件。",
+  "description": "Volcengine Ark Agent Plan Seedream Images 独立请求协议插件。",
   "documentation": "<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>",
   "permissions": [
     "generation.run",
@@ -107,8 +107,8 @@
   "contributes": {
     "providers": [
       {
-        "id": "volcengine-ark-image",
-        "label": "Volcengine Ark Seedream Images",
+        "id": "volcengine-ark-agent-plan-image",
+        "label": "Volcengine Ark Agent Plan Seedream Images",
         "capabilities": [
           "image"
         ],
@@ -185,7 +185,7 @@
         ],
         "create": {
           "method": "POST",
-          "path": "/api/v3/images/generations",
+          "path": "/api/plan/v3/images/generations",
           "contentType": "application/json",
           "body": {
             "model": {
@@ -361,18 +361,18 @@
             },
             "sequential_image_generation": {
               "$omitEmpty": {
-                "$ref": "request.providerOptions.volcengine-ark-image.sequential_image_generation"
+                "$ref": "request.providerOptions.volcengine-ark-agent-plan-image.sequential_image_generation"
               }
             },
             "sequential_image_generation_options": {
               "$omitEmpty": {
-                "$ref": "request.providerOptions.volcengine-ark-image.sequential_image_generation_options"
+                "$ref": "request.providerOptions.volcengine-ark-agent-plan-image.sequential_image_generation_options"
               }
             },
             "watermark": {
               "$coalesce": [
                 {
-                  "$ref": "request.providerOptions.volcengine-ark-image.watermark"
+                  "$ref": "request.providerOptions.volcengine-ark-agent-plan-image.watermark"
                 },
                 {
                   "$ref": "request.watermark"
@@ -382,13 +382,13 @@
             },
             "seed": {
               "$omitEmpty": {
-                "$ref": "request.providerOptions.volcengine-ark-image.seed"
+                "$ref": "request.providerOptions.volcengine-ark-agent-plan-image.seed"
               }
             },
             "response_format": {
               "$coalesce": [
                 {
-                  "$ref": "request.providerOptions.volcengine-ark-image.response_format"
+                  "$ref": "request.providerOptions.volcengine-ark-agent-plan-image.response_format"
                 },
                 "b64_json"
               ]

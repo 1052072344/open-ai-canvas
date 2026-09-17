@@ -5,6 +5,13 @@ description: 当前项目已实现功能的手工验证清单与未确认边界
 
 # 待测试
 
+## 火山方舟 Agent Plan 图片 / 视频插件
+
+- 新增官方协议插件：`volcengine-ark-agent-plan-seedream`（provider `volcengine-ark-agent-plan-image`）与 `volcengine-ark-agent-plan-seedance`（provider `volcengine-ark-agent-plan-video`）。
+- 与官方 Ark 插件的差异只在接入面：默认 Base URL 为 `https://ark.cn-beijing.volces.com/api/plan/v3`，创建路径分别为 `/api/plan/v3/images/generations` 与 `/api/plan/v3/contents/generations/tasks`；请求体、参考素材 role、能力档位与官方 Seedream/Seedance 对齐。必须使用 Agent Plan 专属 API Key，不可与 `/api/v3` 官方 Key 混用。
+- 宿主已把 Agent Plan 协议纳入与官方 Ark 相同的能力默认值、Token 计费校验、方舟素材引用、取消任务与前端 payload 分支。
+- 待管理端安装这两个 `.yingce-plugin` 后：分别创建图片/视频渠道，确认默认 Base URL 为 `/api/plan/v3`；用 Agent Plan Key 文生图、参考图生图、Seedance 文生视频与全模态参考成功；故意混用官方 Key 应失败；官方 `volcengine-ark-*` 渠道行为不受影响。
+
 ## Agent Plan Seedream 误走可信素材（2026-09-17）
 
 根因：`isArkPlanVideoConfig` / 前端 `usesArkVideoAssetReference` 仅按 Base URL 含 `/api/plan/v3` 判断，Agent Plan Seedream 与 Seedance 共用该路径，图片生成被误判为视频可信素材路径，自动 CreateAsset 并把参考图改成 `asset://`，上游图片接口拒绝。修复：后端仅 `mode=video` 且非图片协议时同步可信素材；前端仅视频 mode + 视频协议（或非图片协议的 Plan BaseURL）才提交 `asset://`。后端单测已覆盖。需浏览器验收：

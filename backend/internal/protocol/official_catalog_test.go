@@ -599,6 +599,36 @@ func TestOfficialArkSeedreamMapsAspectRatioToPixelSize(t *testing.T) {
 	}
 }
 
+func TestOfficialArkAgentPlanPluginsUsePlanPaths(t *testing.T) {
+	image := officialPackageAdapter(t, "volcengine-ark-agent-plan-seedream.yingce-plugin", "volcengine-ark-agent-plan-image")
+	imageCreate, err := image.BuildCreate(context.Background(), RequestContext{Request: GenerationRequest{Model: "doubao-seedream-5-0-260128", Prompt: "circle", AspectRatio: "1:1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if imageCreate.Path != "/api/plan/v3/images/generations" {
+		t.Fatalf("agent plan image create = %#v", imageCreate)
+	}
+	if body := manifestTestBody(t, imageCreate); body["size"] != "2048x2048" {
+		t.Fatalf("agent plan image size = %#v", body["size"])
+	}
+
+	video := officialPackageAdapter(t, "volcengine-ark-agent-plan-seedance.yingce-plugin", "volcengine-ark-agent-plan-video")
+	videoCreate, err := video.BuildCreate(context.Background(), RequestContext{Request: GenerationRequest{Model: "doubao-seedance-2-0-260128", Prompt: "walk", AspectRatio: "16:9", Resolution: "720p", Duration: 5}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if videoCreate.Path != "/api/plan/v3/contents/generations/tasks" {
+		t.Fatalf("agent plan video create = %#v", videoCreate)
+	}
+	poll, err := video.BuildPoll(context.Background(), PollContext{TaskID: "task-1", Model: "doubao-seedance-2-0-260128"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if poll.Path != "/api/plan/v3/contents/generations/tasks/task-1" {
+		t.Fatalf("agent plan video poll = %#v", poll)
+	}
+}
+
 func TestOfficialGeminiImageMapsQualityToImageSize(t *testing.T) {
 	adapter := officialPackageAdapter(t, "google-gemini-image.yingce-plugin", "gemini-image")
 	tests := []struct {
