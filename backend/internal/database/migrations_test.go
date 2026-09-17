@@ -61,8 +61,46 @@ func TestMigrateSchemaV15UpgradesExistingDatabase(t *testing.T) {
 		t.Fatal("v15 upgrade did not install Agent profile table and scope index")
 	}
 	status, err := ReadSchemaStatus(db)
-	if err != nil || !status.Ready || status.Current != 15 {
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
 		t.Fatalf("unexpected upgraded schema status: %+v, %v", status, err)
+	}
+}
+
+func TestMigrateSchemaV16BackfillsCanvasRevisions(t *testing.T) {
+	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-canvas-revisions-v16?mode=memory&cache=shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrator().DropTable(&model.CanvasSnapshotResource{}, &model.CanvasSnapshot{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrator().DropColumn(&model.CanvasProject{}, "Revision"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO canvas_projects (id, user_id, title, payload_json) VALUES ('legacy', 'owner', 'Existing canvas', '{"nodes":[]}')`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("version = ?", 16).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	var project model.CanvasProject
+	if err := db.First(&project, "id = ?", "legacy").Error; err != nil {
+		t.Fatal(err)
+	}
+	if project.Revision != 1 || project.PayloadJSON != `{"nodes":[]}` {
+		t.Fatalf("legacy canvas changed: %+v", project)
+	}
+	if !db.Migrator().HasTable(&model.CanvasSnapshot{}) || !db.Migrator().HasTable(&model.CanvasSnapshotResource{}) {
+		t.Fatal("history tables missing")
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatalf("migration not idempotent: %v", err)
 	}
 }
 

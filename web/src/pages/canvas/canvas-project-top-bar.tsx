@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
-import { Clapperboard, CloudDownload, CloudUpload, Coins, CopyPlus, Focus, FolderKanban, Gauge, Home, LayoutGrid, LoaderCircle, Menu, Pencil, Plus, Redo2, Save, Search, Share2, Trash2, Undo2, Upload } from "lucide-react";
+import { Clapperboard, CloudDownload, CloudUpload, Coins, CopyPlus, Focus, FolderKanban, Gauge, History, Home, LayoutGrid, LoaderCircle, Menu, Pencil, Plus, Redo2, Save, Search, Share2, Trash2, Undo2, Upload } from "lucide-react";
 import { Button, Dropdown, Tooltip } from "antd";
 
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
@@ -14,6 +14,9 @@ import type { CanvasMediaPerformanceMode } from "@/types/canvas";
 import { CanvasShortcutsModal } from "./canvas-shortcuts-modal";
 
 type CanvasTopBarProps = {
+    syncStatus?: ReactNode;
+    versionsOpen: boolean;
+    onToggleVersions: () => void;
     title: string;
     titleDraft: string;
     isTitleEditing: boolean;
@@ -43,6 +46,9 @@ type CanvasTopBarProps = {
 };
 
 export function CanvasTopBar({
+    syncStatus,
+    versionsOpen,
+    onToggleVersions,
     title,
     titleDraft,
     isTitleEditing,
@@ -110,9 +116,12 @@ export function CanvasTopBar({
                                     { key: "new", icon: <Plus className="size-4" />, label: "新建画布", onClick: onCreateProject },
                                     { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: "删除当前画布", onClick: onDeleteProject },
                                     { key: "save", icon: <Save className="size-4" />, label: <MenuLabel text="保存" shortcut="⌘ S" />, onClick: () => void onSave() },
-                                    { key: "force-save", icon: <CloudUpload className="size-4" />, label: "强制覆盖保存", onClick: onForceSave },
+                                    { key: "force-save", icon: <CloudUpload className="size-4" />, label: "修复素材关联并保存", onClick: onForceSave },
                                     { type: "divider" },
                                     { key: "import", icon: <Upload className="size-4" />, label: "导入素材", onClick: onImportImage },
+                                    { key: "libtv", icon: <CopyPlus className="size-4" />, label: "导入 LibTV 画布", onClick: onImportLibTV },
+                                    { key: "tapnow", icon: <CloudDownload className="size-4" />, label: "导入 TapNow 画布", onClick: onImportTapNow },
+                                    { key: "share", icon: <Share2 className="size-4" />, label: "分享画布", onClick: onShare },
                                     { key: "search", icon: <Search className="size-4" />, label: <MenuLabel text="搜索节点" shortcut="⌘ F" />, onClick: onOpenSearch },
                                     {
                                         key: "performance",
@@ -185,9 +194,10 @@ export function CanvasTopBar({
                             </div>
                         ) : null}
                     </div>
+                    {syncStatus}
                 </div>
 
-                <div className="canvas-topbar-cluster pointer-events-auto flex items-center gap-1.5" style={dockStyle}>
+                <div className="canvas-topbar-cluster canvas-topbar-tools-cluster pointer-events-auto flex items-center gap-1.5" style={dockStyle}>
                     <CanvasTopBarTooltip label="搜索画布节点">
                         <Button
                             type="text"
@@ -262,6 +272,19 @@ export function CanvasTopBar({
                             </Button>
                         </CanvasTopBarTooltip>
                     ) : null}
+                    <CanvasTopBarTooltip label="版本记录与本地草稿">
+                        <Button
+                            type="text"
+                            className="canvas-topbar-action canvas-topbar-version-button !h-10 !rounded-xl !px-2.5 !font-medium"
+                            style={{ color: theme.node.text, background: versionsOpen ? theme.toolbar.activeBg : undefined }}
+                            icon={<History className="size-4" />}
+                            aria-label="版本记录"
+                            aria-pressed={versionsOpen}
+                            onClick={onToggleVersions}
+                        >
+                            版本
+                        </Button>
+                    </CanvasTopBarTooltip>
                     <CanvasTopBarTooltip label="分享画布">
                         <Button type="text" className="canvas-topbar-action !h-10 !w-10 !min-w-10 !rounded-xl !p-0" style={{ color: theme.node.text }} icon={<Share2 className="size-4" />} onClick={onShare} aria-label="分享画布" />
                     </CanvasTopBarTooltip>
