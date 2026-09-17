@@ -44,6 +44,9 @@ func TestMigrateSchemaRecordsAndValidatesVersion(t *testing.T) {
 	if !db.Migrator().HasTable(&model.AgentMemorySetting{}) {
 		t.Fatal("schema migration v18 did not create agent memory settings")
 	}
+	if !db.Migrator().HasColumn(&model.PaymentProviderConfig{}, "plugin_version") || !db.Migrator().HasColumn(&model.PaymentOrder{}, "plugin_version") {
+		t.Fatal("schema migration v19 did not add payment plugin version columns")
+	}
 	if err := MigrateSchema(db); err != nil {
 		t.Fatalf("migration should be idempotent: %v", err)
 	}
@@ -146,6 +149,38 @@ func TestMigrateSchemaV18UpgradesExistingDatabase(t *testing.T) {
 	}
 	if !db.Migrator().HasTable(&model.AgentMemorySetting{}) {
 		t.Fatal("v18 upgrade did not install agent memory settings")
+	}
+	status, err := ReadSchemaStatus(db)
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
+		t.Fatalf("unexpected upgraded schema status: %+v, %v", status, err)
+	}
+}
+
+func TestMigrateSchemaV19AddsPaymentPluginVersion(t *testing.T) {
+	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-payment-plugin-version-v19?mode=memory&cache=shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrator().DropColumn(&model.PaymentProviderConfig{}, "PluginVersion"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrator().DropColumn(&model.PaymentOrder{}, "PluginVersion"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("version = ?", 19).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatalf("upgrade from v18: %v", err)
+	}
+	if !db.Migrator().HasColumn(&model.PaymentProviderConfig{}, "plugin_version") {
+		t.Fatal("v19 upgrade did not add payment_provider_configs.plugin_version")
+	}
+	if !db.Migrator().HasColumn(&model.PaymentOrder{}, "plugin_version") {
+		t.Fatal("v19 upgrade did not add payment_orders.plugin_version")
 	}
 	status, err := ReadSchemaStatus(db)
 	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
