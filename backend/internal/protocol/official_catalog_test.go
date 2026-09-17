@@ -784,3 +784,27 @@ func TestOfficialOpenAIAudioSpeedDefaultsInvalidAndZeroValues(t *testing.T) {
 		})
 	}
 }
+
+func TestOfficialArkSeedreamParsesB64JSONAsDataURL(t *testing.T) {
+	for _, tc := range []struct {
+		packageName, providerID string
+	}{
+		{"volcengine-ark-seedream.yingce-plugin", "volcengine-ark-image"},
+		{"volcengine-ark-agent-plan-seedream.yingce-plugin", "volcengine-ark-agent-plan-image"},
+	} {
+		t.Run(tc.providerID, func(t *testing.T) {
+			adapter := officialPackageAdapter(t, tc.packageName, tc.providerID)
+			result, err := adapter.ParseCreate(context.Background(), []byte(`{"created":1,"data":[{"b64_json":"aW1hZ2U=","output_format":"jpeg","size":"1824x1024"}]}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Result == nil || len(result.Result.Images) != 1 {
+				t.Fatalf("result = %#v", result.Result)
+			}
+			dataURL := result.Result.Images[0].DataURL
+			if dataURL != "data:image/jpeg;base64,aW1hZ2U=" {
+				t.Fatalf("DataURL = %q, want jpeg data URL from b64_json + output_format", dataURL)
+			}
+		})
+	}
+}

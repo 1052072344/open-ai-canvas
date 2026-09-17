@@ -12,6 +12,14 @@ description: 当前项目已实现功能的手工验证清单与未确认边界
 - 宿主已把 Agent Plan 协议纳入与官方 Ark 相同的能力默认值、Token 计费校验、方舟素材引用、取消任务与前端 payload 分支。
 - 待管理端安装这两个 `.yingce-plugin` 后：分别创建图片/视频渠道，确认默认 Base URL 为 `/api/plan/v3`；用 Agent Plan Key 文生图、参考图生图、Seedance 文生视频与全模态参考成功；故意混用官方 Key 应失败；官方 `volcengine-ark-*` 渠道行为不受影响。
 
+## Seedream 声明式结果裸 b64_json（2026-09-17）
+
+根因：`volcengine-ark-seedream` / `volcengine-ark-agent-plan-seedream` 响应把 `response.data` 原样映射为 images；解析回退把裸 `b64_json` 写入 `DataURL` 却未加 `data:` 前缀，随后 `decodeProviderDataURL` 失败。UI 报「声明式协议媒体结果下载失败：音频 data URL 格式无效」（旧错误文案误写「音频」），但管理端请求明细显示上游 HTTP 200 且已返回内嵌编码。修复：声明式媒体解析对裸 base64 按 `output_format`/kind 补全 data URL；错误文案改为通用「data URL 格式无效」。协议单测已覆盖。需重建后端容器后浏览器验收：
+
+- [ ] Agent Plan / 官方 Seedream 图片渠道（`response_format=b64_json`）文生图、参考图生图成功落盘，不再出现「媒体结果下载失败」。
+- [ ] 上游返回 `output_format=jpeg` 时结果可正常预览。
+- [ ] 管理端该任务对应 create 日志仍为 succeeded / 200，与前端成功态一致。
+
 ## Agent Plan Seedream 误走可信素材（2026-09-17）
 
 根因：`isArkPlanVideoConfig` / 前端 `usesArkVideoAssetReference` 仅按 Base URL 含 `/api/plan/v3` 判断，Agent Plan Seedream 与 Seedance 共用该路径，图片生成被误判为视频可信素材路径，自动 CreateAsset 并把参考图改成 `asset://`，上游图片接口拒绝。修复：后端仅 `mode=video` 且非图片协议时同步可信素材；前端仅视频 mode + 视频协议（或非图片协议的 Plan BaseURL）才提交 `asset://`。后端单测已覆盖。需浏览器验收：
