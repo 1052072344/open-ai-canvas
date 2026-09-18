@@ -831,6 +831,7 @@ function InfiniteCanvasPage() {
         lightingNodeId,
         emotionNodeId,
         annotationNodeId,
+        annotationEditNodeId,
         createImageReversePromptNodes,
         openPortraitTextureEditor,
         cropImageNode,
@@ -852,6 +853,10 @@ function InfiniteCanvasPage() {
         handleSegmentConfirm,
         maskEditImageNode,
         maskEditNodeId,
+        imageEditNodeId,
+        imageEditPreset,
+        layerDecompositionNodeId,
+        textEditNodeId,
         mergeSelectedVideos,
         mergeVideosByIds,
         mergeVideoProgress,
@@ -865,8 +870,23 @@ function InfiniteCanvasPage() {
         setLightingNodeId,
         setEmotionNodeId,
         setAnnotationNodeId,
+        setAnnotationEditNodeId,
         setCropNodeId,
         setMaskEditNodeId,
+        setImageEditNodeId,
+        setImageEditPreset,
+        openImageEditNode,
+        openBackgroundRemoval,
+        openLayerDecomposition,
+        decomposeImageLayers,
+        setLayerDecompositionNodeId,
+        setTextEditNodeId,
+        openTextEditNode,
+        openAnnotationEditNode,
+        detectImageText,
+        editTextImageNode,
+        editAnnotatedImageNode,
+        editImageNode,
         setUpscaleNodeId,
         splitImageNode,
         openVideoFrameExtractor,
@@ -1369,6 +1389,7 @@ function InfiniteCanvasPage() {
         imageAssets,
         infoNode,
         maskEditNode,
+        imageEditNode,
         mentionReferencesByNodeId,
         nodeById,
         previewNode,
@@ -1399,6 +1420,7 @@ function InfiniteCanvasPage() {
         infoNodeId,
         cropNodeId,
         maskEditNodeId,
+        imageEditNodeId,
         annotationNodeId,
         splitNodeId: null,
         upscaleNodeId,
@@ -2798,7 +2820,12 @@ function InfiniteCanvasPage() {
                             onDownload={downloadNodeImage}
                             onSaveAsset={(node) => void saveNodeAsset(node)}
                             onAnnotate={(node) => setAnnotationNodeId(node.id)}
+                            onAnnotationEdit={openAnnotationEditNode}
                             onMaskEdit={(node) => setMaskEditNodeId(node.id)}
+                            onImageEdit={openImageEditNode}
+                            onRemoveBackground={openBackgroundRemoval}
+                            onLayerDecomposition={openLayerDecomposition}
+                            onTextEdit={openTextEditNode}
                             onEmotion={(node) => {
                                 setDialogNodeId(null);
                                 setEmotionNodeId((current) => (current === node.id ? null : node.id));
@@ -3119,15 +3146,32 @@ function InfiniteCanvasPage() {
                         <CanvasProjectMediaDialogs
                             cropNode={cropNode}
                             annotationNode={annotationNode}
+                            annotationEditNode={annotationEditNodeId ? nodeById.get(annotationEditNodeId) || null : null}
                             maskEditNode={maskEditNode}
+                            imageEditNode={imageEditNode}
+                            layerDecompositionNode={layerDecompositionNodeId ? nodeById.get(layerDecompositionNodeId) || null : null}
+                            textEditNode={textEditNodeId ? nodeById.get(textEditNodeId) || null : null}
+                            imageEditPreset={imageEditPreset}
                             upscaleNode={upscaleNode}
                             onCloseCrop={() => setCropNodeId(null)}
                             onCloseAnnotation={() => setAnnotationNodeId(null)}
+                            onCloseAnnotationEdit={() => setAnnotationEditNodeId(null)}
                             onCloseMaskEdit={() => setMaskEditNodeId(null)}
+                            onCloseImageEdit={() => { setImageEditNodeId(null); setImageEditPreset(null); }}
+                            onCloseLayerDecomposition={() => setLayerDecompositionNodeId(null)}
+                            onCloseTextEdit={() => setTextEditNodeId(null)}
                             onCloseUpscale={() => setUpscaleNodeId(null)}
                             onCrop={(node, crop) => void cropImageNode(node, crop)}
                             onAnnotate={(node, dataUrl) => void saveAnnotatedImageNode(node, dataUrl)}
+                            onAnnotationEdit={(node, payload) => void editAnnotatedImageNode(node, payload)}
                             onMaskEdit={(node, payload) => void maskEditImageNode(node, payload)}
+                            onImageEdit={(node, payload) => void editImageNode(node, payload)}
+                            onLayerDecomposition={(node, payload) => void decomposeImageLayers(node, payload)}
+                            onDetectText={() => {
+                                const node = textEditNodeId ? nodeById.get(textEditNodeId) : null;
+                                return node ? detectImageText(node) : Promise.reject(new Error("图片节点已不存在"));
+                            }}
+                            onTextEdit={(node, payload) => void editTextImageNode(node, payload)}
                             onUpscale={(node, params) => void upscaleImageNode(node, params)}
                             config={effectiveConfig}
                         />
