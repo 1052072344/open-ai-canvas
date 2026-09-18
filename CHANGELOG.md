@@ -1,5 +1,13 @@
 ﻿# CHANGELOG
 
+## v1.7.0
+
+- 融合 PR#535 PoloX 图片编辑能力：图片编辑、去背景、图片文字识别与修改、图片标注编辑、AI 图层拆分、Cloud Agent 图片工具链及权限控制、WaveSpeed 异步图片编辑协议与插件。
+- 新增 wavespeed-image-edit / image-tools 插件；画布端新增图片编辑对话框、图层拆分对话框、文字编辑对话框；后端新增 wavespeed_image_edit 测试。
+- 同步融合官方 v1.5.1 release 源码，修复更新流程引用与前端重复 import。
+- 保留本地定制：PR#530 多维表格、自建插件（a6api/metaso-h3/antigravity-proxy/openai-images 渠道适配）、ddcat 多参考图尺寸校验、万有引力 lxmone 连接错误提示、模型 Description（schema v24）、postgres seccomp、Windows 启动脚本。
+- 镜像推送 `ghcr.io/15657306288/open-ai-canvas-web:1.7.0` 与 `ghcr.io/15657306288/open-ai-canvas-backend:1.7.0`。
+
 ## v1.6.0
 
 - 融合官方 main 最新源码（banner 常驻通知、画布版本历史与恢复、提示词编辑、方舟 Agent Plan、支付对账导出）。
