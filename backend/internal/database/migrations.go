@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 23
+const CurrentSchemaVersion int64 = 24
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -89,6 +89,16 @@ var schemaMigrations = []migration{
 	{version: 23, name: "canvas_revision_history", checksum: "sha256:canvas-revision-history-v23-20260918", apply: func(tx *gorm.DB) error {
 		return tx.AutoMigrate(&model.CanvasProject{}, &model.CanvasSnapshot{}, &model.CanvasSnapshotResource{})
 	}},
+	{version: 24, name: "channel_model_description", checksum: "sha256:channel-model-description-v24-20260918", apply: migrateSchemaV24},
+}
+
+// migrateSchemaV24 为系统渠道模型补充面向用户的说明字段。
+// 说明只用于前台选型展示，存量模型保持空说明，不影响价格、路由与结算。
+func migrateSchemaV24(tx *gorm.DB) error {
+	if !tx.Migrator().HasColumn(&model.ChannelModel{}, "Description") {
+		return tx.Migrator().AddColumn(&model.ChannelModel{}, "Description")
+	}
+	return nil
 }
 
 func migrateSchemaV14(tx *gorm.DB) error {

@@ -150,6 +150,7 @@ export type PublicChannelModel = {
     displayName: string;
     sortOrder?: number;
     icon: string;
+    description?: string;
     capability: string;
     protocol?: string;
     capabilityConfig?: Record<string, any>;

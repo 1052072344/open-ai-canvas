@@ -44,6 +44,7 @@ type ChannelModel struct {
 	DisplayName                  string               `json:"displayName" gorm:"size:160"`
 	SortOrder                    int                  `json:"sortOrder" gorm:"not null;default:0"`
 	Icon                         string               `json:"icon" gorm:"size:80"`
+	Description                  string               `json:"description" gorm:"size:600"`
 	Capability                   string               `json:"capability" gorm:"size:32;index"`
 	Protocol                     ChannelInterfaceType `json:"protocol" gorm:"size:32;index"`
 	BillingMode                  string               `json:"billingMode" gorm:"size:32"`

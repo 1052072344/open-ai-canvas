@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
 import { buildBatchConnectionCreateRequest, hasBatchConnectionCandidate, planBatchConnections } from "@/lib/canvas/canvas-batch-connection";
-import { canvasConnectionError } from "@/lib/canvas/canvas-connection-policy";
 import { canvasConnectionPath } from "@/components/canvas/canvas-connections";
 import { defaultConfig } from "@/stores/use-config-store";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData } from "@/types/canvas";
@@ -20,11 +19,6 @@ const nodes: CanvasNodeData[] = [
 const baseConfig = { ...defaultConfig };
 
 describe("planBatchConnections", () => {
-    it("only accepts image inputs for the batch creation table", () => {
-        expect(canvasConnectionError(baseConfig, nodes, [], { fromNodeId: "image-a", toNodeId: "batch-table" })).toBe("");
-        expect(canvasConnectionError(baseConfig, nodes, [], { fromNodeId: "text-a", toNodeId: "batch-table" })).toContain("批量创作表节点只接受图片输入");
-    });
-
     it("plans all legal source nodes and preserves the target handle", () => {
         const result = planBatchConnections({
             sourceNodeIds: ["text-a", "text-b"],
