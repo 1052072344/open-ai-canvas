@@ -4,7 +4,7 @@ import { Brush, Camera, Copy, FileText, Globe2, Grid2x2, Layers3, Lock, LockOpen
 import type { CanvasNodeData } from "@/types/canvas";
 import type { NodeToolbarGroup } from "@/lib/canvas/tool-registry";
 
-type ImageNodeActionToolId = "copyPrompt" | "reversePrompt" | "replace" | "resize" | "annotation" | "annotationEdit" | "textEdit" | "maskEdit" | "imageEdit" | "removeBackground" | "layerDecomposition" | "emotion" | "portraitTexture" | "crop" | "split" | "upscale" | "superResolve" | "angle" | "lighting" | "panorama" | "view";
+type ImageNodeActionToolId = "copyPrompt" | "reversePrompt" | "replace" | "resize" | "annotation" | "annotationEdit" | "textEdit" | "maskEdit" | "removeBackground" | "layerDecomposition" | "emotion" | "portraitTexture" | "crop" | "split" | "upscale" | "superResolve" | "angle" | "lighting" | "panorama" | "view";
 
 type ImageToolHandlers = {
     onUpload: (node: CanvasNodeData) => void;
@@ -13,7 +13,6 @@ type ImageToolHandlers = {
     onAnnotationEdit: (node: CanvasNodeData) => void;
     onTextEdit: (node: CanvasNodeData) => void;
     onMaskEdit: (node: CanvasNodeData) => void;
-    onImageEdit: (node: CanvasNodeData) => void;
     onRemoveBackground: (node: CanvasNodeData) => void;
     onLayerDecomposition: (node: CanvasNodeData) => void;
     onEmotion: (node: CanvasNodeData) => void;
@@ -116,15 +115,6 @@ const imageToolDefinitions: ImageToolDefinition[] = [
         group: "primary",
         order: 15,
         run: (node, handlers) => handlers.onTextEdit(node),
-    },
-    {
-        id: "imageEdit",
-        label: "图片编辑",
-        description: "用文字描述要修改的内容，生成新图片",
-        icon: () => <WandSparkles className="size-3.5" />,
-        group: "primary",
-        order: 20,
-        run: (node, handlers) => handlers.onImageEdit(node),
     },
     {
         id: "removeBackground",

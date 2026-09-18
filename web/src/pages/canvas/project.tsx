@@ -875,7 +875,6 @@ function InfiniteCanvasPage() {
         setMaskEditNodeId,
         setImageEditNodeId,
         setImageEditPreset,
-        openImageEditNode,
         openBackgroundRemoval,
         openLayerDecomposition,
         decomposeImageLayers,
@@ -2171,7 +2170,6 @@ function InfiniteCanvasPage() {
                         onFocusOutput={(nodeId) => focusCanvasImageNode(nodeId)}
                         onReorderReferenceColumns={(fromColumnId, toColumnId) => reorderBatchReferenceColumns(contentNode.id, fromColumnId, toColumnId)}
                         onMoveReferenceCell={(sourceRowId, sourceColumnIndex, targetRowId, targetColumnIndex) => moveBatchReferenceCell(contentNode.id, sourceRowId, sourceColumnIndex, targetRowId, targetColumnIndex)}
-                        onReplaceReference={replaceCanvasNodeMedia}
                         onUploadReference={(rowId, columnIndex, file) => { void handleUploadBatchReference(contentNode.id, rowId, columnIndex, file); }}
                         onConnectStart={(event, handleId) => handleConnectStart(event, contentNode.id, "target", handleId)}
                         onConnectDrop={(event, handleId) => handleConnectDrop(event, contentNode.id, handleId)}
@@ -2838,7 +2836,6 @@ function InfiniteCanvasPage() {
                             onAnnotate={(node) => setAnnotationNodeId(node.id)}
                             onAnnotationEdit={openAnnotationEditNode}
                             onMaskEdit={(node) => setMaskEditNodeId(node.id)}
-                            onImageEdit={openImageEditNode}
                             onRemoveBackground={openBackgroundRemoval}
                             onLayerDecomposition={openLayerDecomposition}
                             onTextEdit={openTextEditNode}
@@ -3181,7 +3178,7 @@ function InfiniteCanvasPage() {
                             onAnnotate={(node, dataUrl) => void saveAnnotatedImageNode(node, dataUrl)}
                             onAnnotationEdit={(node, payload) => void editAnnotatedImageNode(node, payload)}
                             onMaskEdit={(node, payload) => void maskEditImageNode(node, payload)}
-                            onImageEdit={(node, payload) => void editImageNode(node, payload)}
+                            onImageOperation={(node, payload) => void editImageNode(node, payload)}
                             onLayerDecomposition={(node, payload) => void decomposeImageLayers(node, payload)}
                             onDetectText={() => {
                                 const node = textEditNodeId ? nodeById.get(textEditNodeId) : null;
