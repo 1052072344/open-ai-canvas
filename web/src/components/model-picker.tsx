@@ -506,7 +506,7 @@ function tierSpecificationLabel(tier: NonNullable<NonNullable<AiConfig["channels
 function ModelPrice({ price, quote, compact = false }: { price: ModelMenuPrice | null | undefined; quote?: LogicalModelQuote; compact?: boolean }) {
     if (quote) {
         const amount = (quote.amountMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 6 });
-        const label = quote.estimated ? `预计 ${amount}` : `${amount}`;
+        const label = quote.estimated ? `预估:${amount}` : `${amount}`;
         return (
             <span className="inline-flex shrink-0 items-center gap-0.5 text-[var(--fs-tiny)] font-bold tabular-nums text-amber-600 dark:text-amber-300" title={modelQuoteDescription(quote)}>
                 <Coins className="size-3" />
