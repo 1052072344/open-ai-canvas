@@ -54,26 +54,29 @@ type BillingOrder struct {
 	AmountMicrocredits         int64  `json:"amountMicrocredits"`
 	ReservedAmountMicrocredits int64  `json:"reservedAmountMicrocredits"`
 	// ChargeLimitMicrocredits 非零时限制最终用户扣费；Agent 的 Token 报价用它把预授权金额固化为本轮硬上限。
-	ChargeLimitMicrocredits      int64         `json:"chargeLimitMicrocredits,omitempty"`
-	ActualAmountMicrocredits     int64         `json:"actualAmountMicrocredits"`
-	RefundedAmountMicrocredits   int64         `json:"refundedAmountMicrocredits"`
-	InputTokenPriceMicrocredits  int64         `json:"inputTokenPriceMicrocredits"`
-	OutputTokenPriceMicrocredits int64         `json:"outputTokenPriceMicrocredits"`
-	CachedTokenPriceMicrocredits int64         `json:"cachedTokenPriceMicrocredits"`
-	InputTokens                  int64         `json:"inputTokens"`
-	OutputTokens                 int64         `json:"outputTokens"`
-	CachedTokens                 int64         `json:"cachedTokens"`
-	UsageAvailable               bool          `json:"usageAvailable"`
-	Status                       BillingStatus `json:"status" gorm:"index;size:24"`
-	ProviderRequestID            string        `json:"providerRequestId,omitempty" gorm:"index;size:160"`
-	Error                        string        `json:"error,omitempty" gorm:"size:1000"`
-	ResolvedBy                   string        `json:"resolvedBy,omitempty" gorm:"index;size:36"`
-	ResolutionNote               string        `json:"resolutionNote,omitempty" gorm:"size:500"`
-	StartedAt                    *time.Time    `json:"startedAt"`
-	SettledAt                    *time.Time    `json:"settledAt"`
-	RefundedAt                   *time.Time    `json:"refundedAt"`
-	CreatedAt                    time.Time     `json:"createdAt" gorm:"index"`
-	UpdatedAt                    time.Time     `json:"updatedAt"`
+	ChargeLimitMicrocredits      int64 `json:"chargeLimitMicrocredits,omitempty"`
+	ActualAmountMicrocredits     int64 `json:"actualAmountMicrocredits"`
+	RefundedAmountMicrocredits   int64 `json:"refundedAmountMicrocredits"`
+	InputTokenPriceMicrocredits  int64 `json:"inputTokenPriceMicrocredits"`
+	OutputTokenPriceMicrocredits int64 `json:"outputTokenPriceMicrocredits"`
+	CachedTokenPriceMicrocredits int64 `json:"cachedTokenPriceMicrocredits"`
+	InputTokens                  int64 `json:"inputTokens"`
+	OutputTokens                 int64 `json:"outputTokens"`
+	CachedTokens                 int64 `json:"cachedTokens"`
+	// VideoFormulaTokens 固化提交时的视频公式用量，不含预授权余量；旧订单保持 0，不反推历史用量。
+	VideoFormulaTokens int64         `json:"videoFormulaTokens" gorm:"not null;default:0"`
+	UsageSource        string        `json:"usageSource,omitempty" gorm:"size:32;not null;default:''"`
+	UsageAvailable     bool          `json:"usageAvailable"`
+	Status             BillingStatus `json:"status" gorm:"index;size:24"`
+	ProviderRequestID  string        `json:"providerRequestId,omitempty" gorm:"index;size:160"`
+	Error              string        `json:"error,omitempty" gorm:"size:1000"`
+	ResolvedBy         string        `json:"resolvedBy,omitempty" gorm:"index;size:36"`
+	ResolutionNote     string        `json:"resolutionNote,omitempty" gorm:"size:500"`
+	StartedAt          *time.Time    `json:"startedAt"`
+	SettledAt          *time.Time    `json:"settledAt"`
+	RefundedAt         *time.Time    `json:"refundedAt"`
+	CreatedAt          time.Time     `json:"createdAt" gorm:"index"`
+	UpdatedAt          time.Time     `json:"updatedAt"`
 }
 
 type RedeemBatch struct {

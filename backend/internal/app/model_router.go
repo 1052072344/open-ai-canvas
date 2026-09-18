@@ -758,6 +758,9 @@ func skuSelectorForIntent(intent ModelRequestIntent) map[string]string {
 		if seconds, err := strconv.Atoi(strings.TrimSpace(fmt.Sprint(intent.Options["videoSeconds"]))); err == nil && seconds > 0 {
 			selector["videoSeconds"] = strconv.Itoa(seconds)
 		}
+		if audio := normalizedScalar(intent.Options["videoGenerateAudio"]); audio == "true" || audio == "false" {
+			selector["videoGenerateAudio"] = audio
+		}
 	case "image":
 		if intent.Inputs["image"] > 0 {
 			selector["operation"] = "image_to_image"

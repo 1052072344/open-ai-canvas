@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { defaultPriceTier, priceTierResolutionFromForm, priceTierToForm, priceTierVideoSecondsFromForm, skuSelectorFromForm } from "../src/pages/admin/components/channel-model-price-tier-form";
+import { defaultPriceTier, priceTierPayloadFromForm, priceTierResolutionFromForm, priceTierToForm, priceTierVideoSecondsFromForm, skuSelectorFromForm } from "../src/pages/admin/components/channel-model-price-tier-form";
 import type { ChannelModelPriceTier } from "../src/services/api/wallet";
 
 describe("channel model price tier defaults", () => {
@@ -20,7 +20,7 @@ describe("channel model price tier defaults", () => {
     });
 
     test("drops stale video selectors after switching back to the default price", () => {
-        const tier = { ...defaultPriceTier("advanced"), resolution: "1080p", videoSeconds: 10, imageCount: 2 };
+        const tier = { ...defaultPriceTier("advanced"), resolution: "1080p", videoSeconds: 10, videoGenerateAudio: "false", imageCount: 2 };
         const defaultTier = { ...tier, matchMode: "default" as const };
 
         expect(skuSelectorFromForm("video", defaultTier)).toEqual({});
@@ -51,5 +51,22 @@ describe("channel model price tier defaults", () => {
 
         expect(priceTierToForm(base).matchMode).toBe("default");
         expect(priceTierToForm({ ...base, selector: { quality: "2k" } }).matchMode).toBe("advanced");
+        expect(priceTierToForm({ ...base, selector: { videoGenerateAudio: "false" } })).toMatchObject({ matchMode: "advanced", videoGenerateAudio: "false" });
+    });
+
+    test("preserves explicit silent and audible selectors but omits the wildcard", () => {
+        for (const videoGenerateAudio of ["true", "false"]) {
+            const tier = { ...defaultPriceTier("advanced"), videoGenerateAudio };
+            expect(skuSelectorFromForm("video", tier)).toEqual({ videoGenerateAudio });
+            expect(skuSelectorFromForm("image", tier)).toEqual({});
+        }
+        expect(skuSelectorFromForm("video", defaultPriceTier("advanced"))).toEqual({});
+    });
+
+    test("video Token writes discard hidden text prices without changing the configured video rate", () => {
+        const tier = { ...defaultPriceTier("advanced"), billingMode: "token" as const, videoGenerateAudio: "false", inputTokenPrice: 10, outputTokenPrice: 0.25, cachedTokenPrice: 5 };
+        expect(priceTierPayloadFromForm("video", tier, "seedance")).toMatchObject({ selector: { videoGenerateAudio: "false" }, providerModelKey: "seedance", inputTokenPriceMicrocredits: 0, outputTokenPriceMicrocredits: 250_000, cachedTokenPriceMicrocredits: 0 });
+        expect(priceTierPayloadFromForm("text", tier, "text-model")).toMatchObject({ inputTokenPriceMicrocredits: 10_000_000, outputTokenPriceMicrocredits: 250_000, cachedTokenPriceMicrocredits: 5_000_000 });
+        expect(priceTierPayloadFromForm("video", { ...tier, outputTokenPrice: 0 }, "seedance").outputTokenPriceMicrocredits).toBe(0);
     });
 });

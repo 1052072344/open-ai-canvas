@@ -52,6 +52,8 @@ export type ChannelModel = {
     modelKey: string;
     providerModelKey: string;
     displayName: string;
+    channelLabel?: string;
+    description?: string;
     sortOrder?: number;
     icon: string;
     capability: "text" | "image" | "video" | "audio" | "";
@@ -96,6 +98,8 @@ export type ChannelModelMutation = {
     modelKey: string;
     providerModelKey?: string;
     displayName?: string;
+    channelLabel?: string;
+    description?: string;
     icon?: string;
     capability: ChannelModel["capability"];
     protocol?: ChannelModel["protocol"];
@@ -214,6 +218,8 @@ export type BillingOrder = {
     outputTokens: number;
     cachedTokens: number;
     usageAvailable: boolean;
+    videoFormulaTokens?: number;
+    usageSource?: "provider" | "video_formula";
     status: "reserved" | "running" | "settled" | "refunded" | "uncertain";
     providerRequestId?: string;
     error?: string;

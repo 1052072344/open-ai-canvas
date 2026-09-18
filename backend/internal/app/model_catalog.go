@@ -41,6 +41,8 @@ type PublicChannelCatalog struct {
 type PublicChannelModel struct {
 	ID               string                        `json:"id"`
 	ModelKey         string                        `json:"modelKey"`
+	ChannelLabel     string                        `json:"channelLabel"`
+	Description      string                        `json:"description"`
 	DisplayName      string                        `json:"displayName"`
 	SortOrder        int                           `json:"sortOrder"`
 	Icon             string                        `json:"icon"`
@@ -201,6 +203,8 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) (PublicChannelMod
 	return PublicChannelModel{
 		ID:               cm.ID,
 		ModelKey:         cm.ModelKey,
+		ChannelLabel:     cm.ChannelLabel,
+		Description:      cm.Description,
 		DisplayName:      cm.DisplayName,
 		SortOrder:        cm.SortOrder,
 		Icon:             cm.Icon,

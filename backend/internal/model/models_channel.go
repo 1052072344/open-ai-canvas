@@ -42,6 +42,8 @@ type ChannelModel struct {
 	ModelKey                     string               `json:"modelKey" gorm:"size:120;uniqueIndex:idx_channel_model_key_active,priority:2,where:deleted_at IS NULL"`
 	ProviderModelKey             string               `json:"providerModelKey" gorm:"size:120"`
 	DisplayName                  string               `json:"displayName" gorm:"size:160"`
+	ChannelLabel                 string               `json:"channelLabel" gorm:"size:80;not null;default:''"`
+	Description                  string               `json:"description" gorm:"size:500;not null;default:''"`
 	SortOrder                    int                  `json:"sortOrder" gorm:"not null;default:0"`
 	Icon                         string               `json:"icon" gorm:"size:80"`
 	Capability                   string               `json:"capability" gorm:"size:32;index"`
