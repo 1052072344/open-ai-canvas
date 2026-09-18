@@ -7,9 +7,9 @@ import type { PublicChannelCatalog, PublicChannelModel } from "../src/services/a
 import { defaultConfig, normalizeConfigSnapshot, resolveModelRequestConfig, selectableModelsByCapability } from "../src/stores/use-config-store";
 import { defaultModelCapabilityConfig } from "../src/lib/model-capabilities";
 
-function model(label = "", price = 300000): PublicChannelModel {
+function model(label = "", price = 300000, modelKey = "seedance-2.0", displayName = modelKey === "seedance-2.0" ? "Seedance 2.0" : modelKey): PublicChannelModel {
     return {
-        id: label || "test-model", modelKey: "seedance-2.0", displayName: "Seedance 2.0", channelLabel: label,
+        id: `${modelKey}-${label || "default"}`, modelKey, displayName, channelLabel: label,
         description: label ? `${label}的使用说明` : "",
         icon: "ByteDance", capability: "video", protocol: "seedance", available: true,
         pricingMode: "provider", priceLabel: "",
@@ -27,14 +27,15 @@ function fixture() {
     return normalizeConfigSnapshot({ config: { ...defaultConfig, channels: systemChannelModelChannels(channels), model: "b::seedance-2.0", videoModel: "b::seedance-2.0" } }).config;
 }
 
-test("one product exposes every channel and preserves prices through catalog normalization", () => {
+test("one system channel exposes every model and preserves prices through catalog normalization", () => {
     const config = fixture();
     const groups = groupModelsForPicker(config, selectableModelsByCapability(config, "video"));
-    expect(groups).toHaveLength(1);
+    expect(groups).toHaveLength(3);
     expect(config.channels.map((channel) => channel.modelCosts![0].description)).toEqual(["", "优惠渠道-993的使用说明", "特惠渠道-730的使用说明"]);
-    expect(groups[0]).toMatchObject({ label: "Seedance 2.0", icon: "ByteDance", kind: "product" });
-    expect(groups[0].models.map((item) => [item.label, item.models])).toEqual([
-        ["正常渠道", ["a::seedance-2.0"]], ["优惠渠道-993", ["b::seedance-2.0"]], ["特惠渠道-730", ["c::seedance-2.0"]],
+    expect(groups.map((group) => [group.label, group.kind, group.models.map((item) => [item.label, item.models])])).toEqual([
+        ["正常渠道", "system-channel", [["Seedance 2.0", ["a::seedance-2.0"]]]],
+        ["渠道 B", "system-channel", [["Seedance 2.0", ["b::seedance-2.0"]]]],
+        ["渠道 C", "system-channel", [["Seedance 2.0", ["c::seedance-2.0"]]]],
     ]);
     expect(config.channels.map((channel) => priceTierSummaryLabel(priceTiersForCurrentSelection(channel.modelCosts![0].logicalPriceTiers!, "video", config)))).toEqual(["0.3 积分/秒", "0.3 积分/秒", "0.2 积分/秒"]);
 });
@@ -50,13 +51,17 @@ test("selection and quote keep the chosen channel even when another channel is c
     expect(resolveModelRequestConfig(config, value)).toMatchObject({ channelId: "b", model: "seedance-2.0" });
 });
 
-test("product keys and capabilities stay distinct despite equal display names", () => {
+test("system channel aggregation keeps models distinct within one channel", () => {
     const config = fixture();
-    config.channels[1].models = ["seedance-2.0-fast"];
-    config.channels[1].modelCosts![0].model = "seedance-2.0-fast";
-    config.channels[2].modelCosts![0].capability = "image";
-    const groups = groupModelsForPicker(config, ["a::seedance-2.0", "b::seedance-2.0-fast", "c::seedance-2.0"]);
-    expect(groups).toHaveLength(3);
+    const extra = systemChannelModelChannels([{ id: "volc", name: "火山引擎", displayName: "火山引擎", models: [
+        model("Seedance 2 Mini", 300000, "seedance-2-mini", "Seedance 2 Mini"),
+        model("Seedance 2.0 Fast", 300000, "seedance-2-fast", "Seedance 2.0 Fast"),
+        model("Seedance 2.0", 300000, "seedance-2", "Seedance 2.0"),
+    ] }]);
+    const groups = groupModelsForPicker({ ...config, channels: extra }, selectableModelsByCapability({ ...config, channels: extra }, "video"));
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ label: "火山引擎", kind: "system-channel" });
+    expect(groups[0].models.map((item) => item.label)).toEqual(["Seedance 2 Mini", "Seedance 2.0 Fast", "Seedance 2.0"]);
 });
 
 test("group metadata is stable across channel reorder and current selection", () => {
@@ -64,8 +69,8 @@ test("group metadata is stable across channel reorder and current selection", ()
     config.channels[1].modelCosts![0].displayName = "不同展示名";
     config.channels[1].modelCosts![0].icon = "Jimeng";
     const options = selectableModelsByCapability(config, "video");
-    const first = groupModelsForPicker(config, options)[0];
-    const reordered = groupModelsForPicker({ ...config, channels: [...config.channels].reverse(), model: "c::seedance-2.0" }, options)[0];
+    const first = groupModelsForPicker(config, options).find((group) => group.label === "渠道 C")!;
+    const reordered = groupModelsForPicker({ ...config, channels: [...config.channels].reverse(), model: "c::seedance-2.0" }, options).find((group) => group.label === "渠道 C")!;
     expect([reordered.label, reordered.icon]).toEqual([first.label, first.icon]);
     expect(reordered.models[0].models).toEqual(["c::seedance-2.0"]);
 });
@@ -78,7 +83,7 @@ test("each channel keeps its own capability restrictions", () => {
     const requirements = { capability: "video" as const, input: { textCount: 1, imageCount: 1, videoCount: 0, audioCount: 0, characterCount: 0 } };
     expect(modelCompatibilityError(config, "a::seedance-2.0", requirements)).not.toBe("");
     expect(modelCompatibilityError(config, "b::seedance-2.0", requirements)).toBe("");
-    expect(groupModelsForPicker(config, selectableModelsByCapability(config, "video"))[0].models).toHaveLength(3);
+    expect(groupModelsForPicker(config, selectableModelsByCapability(config, "video")).every((group) => group.models.length === 1)).toBe(true);
 });
 
 test("managed logical models and personal channels never become system product routes", () => {
@@ -87,7 +92,7 @@ test("managed logical models and personal channels never become system product r
     config.channels[1].modelCosts![0].logicalModelId = "logical-test";
     config.channels[2].scope = "user";
     const groups = groupModelsForPicker(config, ["a::seedance-2.0", "managed::seedance-2.0", "c::seedance-2.0"]);
-    expect(groups.map((item) => item.kind)).toEqual(["product", "channel", "channel"]);
+    expect(groups.map((item) => item.kind)).toEqual(["system-channel", "channel", "channel"]);
     expect(groups[0].models).toHaveLength(1);
     expect(groupModelsForPicker(config, [])).toEqual([]);
 });

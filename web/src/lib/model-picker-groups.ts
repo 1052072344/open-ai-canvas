@@ -6,7 +6,7 @@ export type ModelPickerGroup = {
     label: string;
     icon: string;
     scope: string;
-    kind: "product" | "channel";
+    kind: "product" | "channel" | "system-channel";
     models: DisplayModelGroup[];
 };
 
@@ -23,21 +23,26 @@ export function modelChannelLabel(config: AiConfig, value: string) {
     return cost?.channelLabel?.trim() || channel.publicAlias?.trim() || channel.name || "未命名渠道";
 }
 
-// 只构建展示树。每个产品下的叶子仍是独立的渠道选择，不能交给模型族自动路由。
+// 系统模型按渠道聚合展示，但每个模型仍保留独立的 channelId::modelKey 选择值。
 export function groupModelsForPicker(config: AiConfig, options: string[]): ModelPickerGroup[] {
     const groups = new Map<string, ModelPickerGroup>();
     for (const channel of config.channels) {
         const models = options.filter((value) => resolveModelChannel(config, value).id === channel.id);
-        for (const value of models) {
-            if (!isDirectSystemModel(config, value)) continue;
-            const cost = channel.modelCosts?.find((item) => item.model === modelOptionName(value));
-            const key = JSON.stringify(["product", cost?.capability, modelOptionName(value)]);
-            let group = groups.get(key);
-            if (!group) {
-                group = { key, label: "", icon: "", scope: "平台服务", kind: "product", models: [] };
-                groups.set(key, group);
-            }
-            group.models.push({ key: value, label: modelChannelLabel(config, value), models: [value] });
+        const directModels = models.filter((value) => isDirectSystemModel(config, value));
+        if (directModels.length) {
+            const key = JSON.stringify(["system-channel", channel.id]);
+            groups.set(key, {
+                key,
+                label: channel.name || "未命名渠道",
+                icon: modelIcon(config, directModels[0]),
+                scope: "平台服务",
+                kind: "system-channel",
+                models: directModels.map((value) => ({
+                    key: value,
+                    label: configuredModelDisplayName(config, value),
+                    models: [value],
+                })),
+            });
         }
         const otherModels = models.filter((value) => !isDirectSystemModel(config, value));
         if (otherModels.length) {
@@ -51,14 +56,6 @@ export function groupModelsForPicker(config: AiConfig, options: string[]): Model
                 models: groupModelsByDisplayName(config, otherModels),
             });
         }
-    }
-    for (const group of groups.values()) {
-        if (group.kind !== "product") continue;
-        // 元数据按稳定身份取值，不随当前选中项或渠道排序变化；叶子顺序仍遵循后台排序。
-        const members = group.models.map((item) => item.models[0]).sort();
-        const named = members.find((value) => configuredModelDisplayName(config, value) !== modelOptionName(value));
-        group.label = configuredModelDisplayName(config, named || members[0]);
-        group.icon = members.map((value) => modelIcon(config, value)).find(Boolean) || "";
     }
     return Array.from(groups.values());
 }
