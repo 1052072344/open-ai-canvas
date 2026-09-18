@@ -3,6 +3,8 @@ package service
 import "infinite-canvas/backend/internal/app"
 
 type (
+	PaymentOrderQuery                      = app.PaymentOrderQuery
+	PaymentReconciliationQuery             = app.PaymentReconciliationQuery
 	CloudAgentRequest                      = app.CloudAgentRequest
 	CloudAgentMediaSettings                = app.CloudAgentMediaSettings
 	CloudAgentCapabilitySet                = app.CloudAgentCapabilitySet
