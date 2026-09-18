@@ -1863,6 +1863,10 @@
         background: var(--dock-command-hover) !important;
     }
 
+    .canvas-topbar-action:hover:not(:disabled) .app-workspace-credit-gift {
+        transform: translateY(-1px) rotate(-8deg);
+    }
+
     .canvas-topbar-project-cluster {
         width: max-content;
         max-width: min(360px, calc(50vw - 88px));
@@ -16099,11 +16103,12 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 .app-user-workspace .app-workspace-topbar-credit-pill {
     display: inline-flex;
     flex-shrink: 0;
+    overflow: visible;
     white-space: nowrap;
     height: 36px;
     align-items: center;
-    gap: 7px;
-    padding: 0 12px;
+    gap: 8px;
+    padding: 0 12px 0 8px;
     border: 1px solid rgba(0, 0, 0, .075);
     border-radius: 999px;
     background: #fff;
@@ -16113,15 +16118,46 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 }
 
 .app-user-workspace .app-workspace-topbar-credit-pill:hover {
-    border-color: rgba(91, 78, 224, .26);
-    background: #fbfaff;
+    border-color: color-mix(in srgb, #ff8a28 34%, transparent);
+    background: #fffaf4;
     transform: translateY(-1px);
 }
 
-.app-user-workspace .app-workspace-topbar-credit-pill svg {
-    width: 15px;
-    height: 15px;
-    color: #6a58e8;
+.app-user-workspace .app-workspace-credit-gift {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    place-items: center;
+    filter: drop-shadow(0 1px 1px rgba(92, 42, 0, .22));
+    transform-origin: 50% 70%;
+    transition: transform .18s ease;
+}
+
+.app-user-workspace .app-workspace-credit-gift svg {
+    width: 24px;
+    height: 24px;
+    overflow: visible;
+    color: unset;
+}
+
+.app-user-workspace .app-workspace-credit-gift.is-compact,
+.app-user-workspace .app-workspace-credit-gift.is-compact svg {
+    width: 18px;
+    height: 18px;
+}
+
+.app-user-workspace .app-workspace-topbar-credit-pill:hover .app-workspace-credit-gift {
+    transform: translateY(-1px) rotate(-8deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-user-workspace .app-workspace-topbar-credit-pill,
+    .app-user-workspace .app-workspace-credit-gift,
+    .app-user-workspace .app-workspace-topbar-credit-pill:hover .app-workspace-credit-gift {
+        transform: none;
+        transition: none;
+    }
 }
 
 .app-user-workspace .app-workspace-topbar-credit-pill strong {
@@ -16268,9 +16304,9 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 .app-user-workspace .app-workspace-sidebar-storage {
     display: flex;
     min-width: 0;
-    flex-direction: column;
-    gap: 6px;
-    padding: 8px 8px 6px;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
     border-radius: 12px;
     color: inherit;
     text-decoration: none;
@@ -16282,9 +16318,38 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     background: var(--user-surface-hover, rgba(72, 72, 73, .055));
 }
 
+.app-user-workspace .app-workspace-sidebar-storage:hover .app-workspace-sidebar-storage-icon,
+.app-user-workspace .app-workspace-sidebar-storage:focus-visible .app-workspace-sidebar-storage-icon {
+    color: var(--user-ink, var(--foreground));
+}
+
 .app-user-workspace .app-workspace-sidebar-storage:focus-visible {
     outline: 2px solid var(--control-focus-ring);
     outline-offset: 2px;
+}
+
+.app-user-workspace .app-workspace-sidebar-storage-icon {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    place-items: center;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--user-ink, var(--foreground)) 8%, transparent);
+    color: color-mix(in srgb, var(--user-ink, var(--foreground)) 78%, transparent);
+}
+
+.app-user-workspace .app-workspace-sidebar-storage-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.app-user-workspace .app-workspace-sidebar-storage-body {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 6px;
 }
 
 .app-user-workspace .app-workspace-sidebar-storage-copy {
@@ -16292,6 +16357,13 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     min-width: 0;
     flex-direction: column;
     gap: 2px;
+}
+
+.app-user-workspace .app-workspace-sidebar-storage-foot {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
 }
 
 .app-user-workspace .app-workspace-sidebar-storage-meta {
@@ -16326,12 +16398,14 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 }
 
 .app-user-workspace .app-workspace-sidebar-storage-remain {
-    min-width: 0;
+    line-height: 1;
 }
 
 .app-user-workspace .app-workspace-sidebar-storage-track {
     display: block;
-    height: 5px;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 4px;
     overflow: hidden;
     border-radius: 999px;
     background: color-mix(in srgb, var(--user-ink, var(--foreground)) 10%, transparent);
@@ -16353,16 +16427,26 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     background: color-mix(in srgb, var(--user-ink, var(--foreground)) 8%, transparent);
 }
 
-.app-user-workspace .app-workspace-sidebar-storage.is-warn .app-workspace-sidebar-storage-used {
+.app-user-workspace .app-workspace-sidebar-storage.is-warn .app-workspace-sidebar-storage-used,
+.app-user-workspace .app-workspace-sidebar-storage.is-warn .app-workspace-sidebar-storage-icon {
     color: var(--status-warning);
+}
+
+.app-user-workspace .app-workspace-sidebar-storage.is-warn .app-workspace-sidebar-storage-icon {
+    background: color-mix(in srgb, var(--status-warning) 14%, transparent);
 }
 
 .app-user-workspace .app-workspace-sidebar-storage.is-warn .app-workspace-sidebar-storage-track > span {
     background: var(--status-warning);
 }
 
-.app-user-workspace .app-workspace-sidebar-storage.is-critical .app-workspace-sidebar-storage-used {
+.app-user-workspace .app-workspace-sidebar-storage.is-critical .app-workspace-sidebar-storage-used,
+.app-user-workspace .app-workspace-sidebar-storage.is-critical .app-workspace-sidebar-storage-icon {
     color: var(--status-error);
+}
+
+.app-user-workspace .app-workspace-sidebar-storage.is-critical .app-workspace-sidebar-storage-icon {
+    background: color-mix(in srgb, var(--status-error) 14%, transparent);
 }
 
 .app-user-workspace .app-workspace-sidebar-storage.is-critical .app-workspace-sidebar-storage-track > span {
@@ -16379,6 +16463,11 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     font-size: var(--fs-tiny);
 }
 
+.app-user-workspace .app-workspace-sidebar-storage.is-error .app-workspace-sidebar-storage-icon {
+    color: color-mix(in srgb, var(--status-error) 72%, transparent);
+    background: color-mix(in srgb, var(--status-error) 12%, transparent);
+}
+
 .app-user-workspace .app-workspace-sidebar-storage.is-error button {
     color: var(--user-ink, var(--foreground));
     text-decoration: underline;
@@ -16391,24 +16480,41 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 }
 
 .app-user-workspace .app-workspace-sidebar-storage.is-collapsed {
-    width: 36px;
-    padding: 8px 0 6px;
+    width: 40px;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0;
     margin-inline: auto;
 }
 
+.app-user-workspace .app-workspace-sidebar-storage.is-collapsed .app-workspace-sidebar-storage-track {
+    flex: none;
+    width: 32px;
+}
+
 .app-user-workspace .app-workspace-sidebar-storage.is-collapsed.is-error {
-    width: 36px;
+    width: 40px;
     min-height: 0;
-    padding: 2px 0 4px;
+    padding: 2px 0;
 }
 
 .app-user-workspace .app-workspace-sidebar-storage.is-collapsed.is-error button {
-    display: block;
-    width: 36px;
-    height: 5px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--status-error) 48%, transparent);
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--status-error) 14%, transparent);
+    color: var(--status-error);
     text-decoration: none;
+}
+
+.app-user-workspace .app-workspace-sidebar-storage.is-collapsed.is-error .app-workspace-sidebar-storage-icon {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    color: inherit;
 }
 
 .app-user-workspace .app-workspace-sidebar-profile-row {
@@ -18604,6 +18710,11 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 }
 .app-user-workspace .app-workspace-topbar-breadcrumb { color: var(--user-ink-muted) !important; }
 .app-user-workspace .app-workspace-topbar-credit-pill { border-color: var(--user-border) !important; background: var(--user-surface) !important; color: var(--user-ink-muted) !important; }
+.app-user-workspace .app-workspace-topbar-credit-pill:hover,
+.app-user-workspace .app-workspace-topbar-credit-pill:focus-visible {
+    border-color: color-mix(in srgb, #ff8a28 36%, var(--user-border)) !important;
+    background: color-mix(in srgb, #ff8a28 10%, var(--user-surface)) !important;
+}
 .app-user-workspace .app-workspace-topbar-credit-pill strong { color: var(--user-ink) !important; }
 
 /* One scroll owner on the creation route. */
