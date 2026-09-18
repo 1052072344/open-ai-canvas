@@ -118,7 +118,6 @@ export function AgentChatMessage({
                         <ChevronDown className="agent-reasoning-chevron" aria-hidden="true" />
                     </summary>
                     <div className="agent-reasoning-content" data-canvas-wheel-scroll>
-                        <span className="agent-reasoning-rail" aria-hidden="true" />
                         <div className="agent-reasoning-text">{item.text || (item.streaming ? "正在整理思路…" : "暂无可展示的推理摘要")}</div>
                     </div>
                 </details>
@@ -235,7 +234,7 @@ export function AgentPendingToolCard({ summary, detail, theme, onReject, onAppro
     return (
         <div className="flex items-start gap-3">
             <AgentTimelineMarker theme={theme} tone="approval" icon={<CircleAlert className="size-3.5" />} />
-            <div className="agent-pending-tool min-w-0 flex-1 rounded-r-lg border-l-2 py-1 pl-3 pr-1" style={{ borderColor: "#f97316", background: "rgba(249,115,22,.05)", color: theme.node.text }}>
+            <div className="agent-pending-tool min-w-0 flex-1 rounded-lg border py-2 pl-3 pr-3" style={{ borderColor: "rgba(249,115,22,.22)", background: "rgba(249,115,22,.05)", color: theme.node.text }}>
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2 text-[13px] font-semibold leading-5">
@@ -835,7 +834,6 @@ function AgentTimelineMarker({ theme, tone, icon }: { theme: (typeof canvasTheme
     const color = tone === "error" ? "#ef4444" : tone === "approval" ? "#f97316" : tone === "tool" ? "#4f7cff" : tone === "agent" ? theme.accent.primary : theme.node.muted;
     return (
         <span className="relative flex w-6 shrink-0 self-stretch justify-center" aria-hidden="true">
-            <span className="absolute bottom-[-20px] top-6 w-px opacity-35" style={{ background: theme.toolbar.border }} />
             <span className="relative grid size-6 place-items-center rounded-full" style={{ background: tone === "agent" ? theme.accent.primarySoft : theme.node.fill, color }}>
                 {icon || <span className="size-3 opacity-90" style={{ background: color, WebkitMask: "url(/icons/openai.svg) center / contain no-repeat", mask: "url(/icons/openai.svg) center / contain no-repeat" }} />}
             </span>

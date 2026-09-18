@@ -350,7 +350,15 @@ export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Pro
                     spellCheck={props.spellCheck}
                     tabIndex={props.tabIndex}
                     className={`${className || ""} relative z-10 cursor-text select-text whitespace-pre-wrap break-words`}
-                    style={{ ...mergedStyle, color: style?.color || theme.node.text }}
+                    style={{
+                        ...mergedStyle,
+                        color: style?.color || theme.node.text,
+                        height: "100%",
+                        minHeight: 0,
+                        maxHeight: "100%",
+                        overflowY: "auto",
+                        overflowX: "hidden",
+                    }}
                     onInput={syncEditableValue}
                     onCompositionStart={(event) => {
                         composingRef.current = true;
@@ -489,7 +497,7 @@ if (event.key === "Enter" && (event.nativeEvent.isComposing || composingRef.curr
                 }}
                 value={value}
                 className={`${className || ""} relative z-10`}
-                style={mergedStyle}
+                style={{ ...mergedStyle, height: "100%", minHeight: 0, maxHeight: "100%", overflowY: "auto", overflowX: "hidden" }}
                 onChange={(event) => {
                     const next = event.target.value;
                     onChange(next);
