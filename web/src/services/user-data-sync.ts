@@ -47,21 +47,32 @@ export async function initializeRemoteUserDataSession(userId: string) {
     });
 }
 
+function liveCanvasIfUnchanged(id: string, snapshot: CanvasProject | null | undefined) {
+    const live = useCanvasStore.getState().openProject(id);
+    if (live === snapshot) return live;
+    if (!snapshot) return live ? undefined : null;
+    return live && sameCanvasContent(live, snapshot) ? live : undefined;
+}
+
 export async function loadCanvasProjectForEditing(id: string, options: { latest?: boolean; historyRestore?: { snapshotId: string; revision: number }; onLoad?: (project: CanvasProject) => void } = {}) {
     const epoch = sessionEpoch;
     const request = withRemoteUserDataSyncExclusive(async () => {
         if (epoch !== sessionEpoch) throw new Error("账号已切换，请重新打开画布");
         requireRemoteUserDataBaseline();
         const scope = getActiveUserScope();
+        const requireUnchangedLocal = (snapshot: CanvasProject | null | undefined, message: string) => {
+            if (epoch !== sessionEpoch || getActiveUserScope() !== scope) throw new Error("账号已切换，请重新打开画布");
+            const live = liveCanvasIfUnchanged(id, snapshot);
+            if (live === undefined) throw new Error(message);
+            return live;
+        };
         if (options.historyRestore) {
             const local = useCanvasStore.getState().openProject(id);
             if (local) {
                 const draftCount = await preserveCanvasSyncDraft(local, scope);
                 useSyncProgressStore.getState().setProjectProgress(id, { draftCount });
             }
-            if (epoch !== sessionEpoch || getActiveUserScope() !== scope || useCanvasStore.getState().openProject(id) !== local) {
-                throw new Error("本地内容仍在更新，请稍后再恢复历史版本");
-            }
+            requireUnchangedLocal(local, "本地内容仍在更新，请稍后再恢复历史版本");
             const { snapshotId, revision } = options.historyRestore;
             try {
                 const saved = await restoreRemoteCanvasHistory(id, snapshotId, revision);
@@ -95,7 +106,7 @@ export async function loadCanvasProjectForEditing(id: string, options: { latest?
         const dirty = local && (!verifiedProjects.has(id) && incrementalSession ? !cachedClean : !sameCanvasContent(acknowledgedProjects.get(id), local));
         if (dirty && !sameCanvasContent(local, remote)) {
             const draftCount = await preserveCanvasSyncDraft(local, scope);
-            if (epoch !== sessionEpoch || getActiveUserScope() !== scope || useCanvasStore.getState().openProject(id) !== local) throw new Error("画布仍在更新，已保留本地内容，请稍后再加载最新版本");
+            const liveAfterDraft = requireUnchangedLocal(local, "画布仍在更新，已保留本地内容，请稍后再加载最新版本");
             useSyncProgressStore.getState().setProjectProgress(id, { draftCount });
             if (!options.latest && !options.historyRestore && local.revision !== undefined) {
                 if (local.revision !== remote.revision) {
@@ -108,16 +119,14 @@ export async function loadCanvasProjectForEditing(id: string, options: { latest?
                     useSyncProgressStore.getState().setProjectProgress(id, { phase: "pending", message: "本地草稿等待保存到云端" });
                     scheduleRemoteUserDataSync();
                 }
-                options.onLoad?.(local);
-                return local;
+                options.onLoad?.(liveAfterDraft || local);
+                return liveAfterDraft || local;
             }
         }
         // Editing/generation may continue during the network request or draft write.
-        // Never replace a newer local state which has not been backed up.
-        if (epoch !== sessionEpoch || getActiveUserScope() !== scope || useCanvasStore.getState().openProject(id) !== local) {
-            throw new Error("画布仍在更新，已保留本地内容，请稍后再加载最新版本");
-        }
-        const project = { ...remote, viewport: local?.viewport || remote.viewport || { x: 0, y: 0, k: 1 }, remoteContentHash: hash };
+        // Viewport-only updates are not document edits and must not block adopting cloud content.
+        const live = requireUnchangedLocal(local, "画布仍在更新，已保留本地内容，请稍后再加载最新版本");
+        const project = { ...remote, viewport: live?.viewport || local?.viewport || remote.viewport || { x: 0, y: 0, k: 1 }, remoteContentHash: hash };
         // Align live editor refs synchronously before publishing the new revision.
         // A generation callback must never see old rendered nodes paired with a new revision.
         options.onLoad?.(project);

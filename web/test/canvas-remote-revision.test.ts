@@ -235,6 +235,35 @@ test("loading aligns live editor content before publishing its server revision",
     expect(useCanvasStore.getState().openProject("canvas")!.revision).toBe(2);
 });
 
+test("viewport-only updates during latest load still adopt cloud content", async () => {
+    remote.set("canvas", { ...addNode(canvas(), "remote-video"), revision: 2 });
+    useCanvasStore.getState().updateProject("canvas", { nodes: addNode(canvas(), "local-video").nodes });
+    const working = localforage.setItem;
+    let release!: () => void;
+    let started!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    const entered = new Promise<void>((resolve) => {
+        started = resolve;
+    });
+    localforage.setItem = (async (key: string, value: unknown) => {
+        if (key.includes("sync-drafts:")) {
+            started();
+            await waiting;
+        }
+        return working(key, value);
+    }) as typeof localforage.setItem;
+    const loading = loadCanvasProjectForEditing("canvas", { latest: true });
+    await entered;
+    useCanvasStore.getState().updateProject("canvas", { viewport: { x: 40, y: 12, k: 1.5 } });
+    release();
+    const loaded = await loading;
+    expect(loaded.nodes.at(-1)!.id).toBe("remote-video");
+    expect(useCanvasStore.getState().openProject("canvas")!.revision).toBe(2);
+    expect(useCanvasStore.getState().openProject("canvas")!.viewport).toEqual({ x: 40, y: 12, k: 1.5 });
+});
+
 test("edits arriving during draft backup prevent replacement of the live canvas", async () => {
     useCanvasStore.getState().renameProject("canvas", "first local edit");
     const working = localforage.setItem;
