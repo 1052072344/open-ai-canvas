@@ -178,7 +178,8 @@ export function systemChannelModelChannels(channels: PublicChannelCatalog[]): Mo
                 return {
                     model: model.modelKey,
                     displayName: model.displayName,
-                    description: "",
+                    channelLabel: model.channelLabel,
+                    description: model.description || "",
                     icon: model.icon || "",
                     capability: model.capability as ModelCapability,
                     protocol: model.protocol as any,

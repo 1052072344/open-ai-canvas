@@ -363,6 +363,7 @@ export type ModelChannel = {
     modelCosts?: Array<{
         model: string;
         displayName?: string;
+        channelLabel?: string;
         description?: string;
         icon?: string;
         capability: ModelCapability;
