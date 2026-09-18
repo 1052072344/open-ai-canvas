@@ -1,5 +1,12 @@
 ﻿# CHANGELOG
 
+## v1.6.0
+
+- 融合官方 main 最新源码（banner 常驻通知、画布版本历史与恢复、提示词编辑、方舟 Agent Plan、支付对账导出）。
+- 多维表格升级以 PR#530 实现为主：全局提示词、任务开关、参考图点击替换/拖拽交换/列排序、连线自动刷新、表格整表拖动与缩略图修复。
+- 保留本地定制：ddcat 多参考图尺寸校验、万有引力 lxmone 连接错误提示、模型 Description（schema v24）、自建插件（a6api/metaso-h3/antigravity-proxy/lxmone）、postgres seccomp、Windows 启动脚本。
+- 数据库迁移升至 v24；镜像推送 `ghcr.io/15657306288/open-ai-canvas-web:1.6.0` 与 `ghcr.io/15657306288/open-ai-canvas-backend:1.6.0`。
+
 ## Unreleased
 
 ## v1.5.0
