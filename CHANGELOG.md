@@ -1,5 +1,12 @@
 ﻿# CHANGELOG
 
+## v1.6.0
+
+- 融合官方 main 最新源码（banner 常驻通知、画布版本历史与恢复、提示词编辑、方舟 Agent Plan、支付对账导出）。
+- 多维表格升级以 PR#530 实现为主：全局提示词、任务开关、参考图点击替换/拖拽交换/列排序、连线自动刷新、表格整表拖动与缩略图修复。
+- 保留本地定制：ddcat 多参考图尺寸校验、万有引力 lxmone 连接错误提示、模型 Description（schema v24）、自建插件（a6api/metaso-h3/antigravity-proxy/lxmone）、postgres seccomp、Windows 启动脚本。
+- 数据库迁移升至 v24；镜像推送 `ghcr.io/15657306288/open-ai-canvas-web:1.6.0` 与 `ghcr.io/15657306288/open-ai-canvas-backend:1.6.0`。
+
 ## Unreleased
 
 ## v1.5.1
@@ -15,6 +22,15 @@
 ## v1.5.0
 
 - 发布正式版本 `v1.5.0`，提供 `ghcr.io/ddcat-ai/open-ai-canvas-web:1.5.0` 与 `ghcr.io/ddcat-ai/open-ai-canvas-backend:1.5.0` 的 Linux amd64/arm64 镜像，并更新 `latest` 镜像。
+- 管理后台改为独立设计系统，与用户端皮肤隔离。
+- 完善云端 Agent：计划插话与记忆、统一文本模型选择、媒体失败后对话可继续、漏传快照由服务端补齐；生成审批支持改模型参数并取消 8 轮硬限制。
+- 新增虎皮椒聚合支付官方插件与跨平台 provider；积分中心改为全局弹窗，去掉独立钱包页。
+- 工作台侧栏增加账号容量进度与签到加油站；创作页加宽对话区、工具条进顶栏、默认图片生成，并修正参数弹窗表面色。
+- 画布新增发送到 Agent 快捷入口，修复重生成媒体绑定死锁、素材删除误拦已结束任务，以及图片档位并集与视频提示词上限。
+
+## v1.4.0
+
+- 发布正式版本 `v1.4.0`，提供 `ghcr.io/ddcat-ai/open-ai-canvas-web:1.4.0` 与 `ghcr.io/ddcat-ai/open-ai-canvas-backend:1.4.0` 的 Linux amd64/arm64 镜像，并更新 `latest` 镜像。
 - 管理后台改为独立设计系统，与用户端皮肤隔离。
 - 完善云端 Agent：计划插话与记忆、统一文本模型选择、媒体失败后对话可继续、漏传快照由服务端补齐；生成审批支持改模型参数并取消 8 轮硬限制。
 - 新增虎皮椒聚合支付官方插件与跨平台 provider；积分中心改为全局弹窗，去掉独立钱包页。
