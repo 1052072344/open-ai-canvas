@@ -9980,6 +9980,42 @@ html[data-magicui-theme-vt="active"] .admin-shell * {
     padding: 16px;
 }
 
+.admin-system-update-versions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 18px;
+    padding-bottom: 14px;
+}
+
+.admin-system-update-versions > div {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.admin-system-update-versions span {
+    width: 100%;
+    color: var(--admin-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.admin-system-update-versions strong {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: clamp(18px, 2.4vw, 26px);
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+}
+
+.admin-system-update-hint {
+    margin: 0 0 14px;
+    color: var(--admin-text-secondary, var(--admin-text-muted));
+    font-size: 12px;
+    line-height: 1.65;
+}
+
 .admin-system-update-version-row {
     display: flex;
     align-items: center;
