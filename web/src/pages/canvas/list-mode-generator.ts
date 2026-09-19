@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import { message } from "antd";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasBatchTableData, type CanvasBatchRow } from "@/types/canvas";
 import { runBackendGenerationTask } from "@/services/api/generation-task";
-import { resolveCanvasGenerationModel } from "@/lib/canvas/canvas-project-generation";
+import { buildGenerationConfig } from "@/lib/canvas/canvas-project-generation";
 import type { AiConfig } from "@/stores/use-config-store";
 
 const LIST_MODE_SYSTEM_PROMPT = `你是一个电商内容分析助手。用户会给你多张产品图片和一个任务描述。
@@ -95,8 +95,7 @@ export async function handleListGenerate({
     setRunningNodeId(sourceNodeId);
 
     try {
-        const model = resolveCanvasGenerationModel(config, undefined, "text");
-        const listConfig = { ...config, model };
+        const listConfig = buildGenerationConfig(config, sourceNode, "text");
 
         const referenceImages = imageNodes.map((node) => ({
             id: node.id,
