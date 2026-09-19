@@ -1,6 +1,6 @@
-import { Modal, Upload } from "antd";
+import { App, Modal, Upload } from "antd";
 import { CloudUpload, FileText, ShieldCheck } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { RegisteredPlugin } from "@/lib/plugins/plugin-types";
 
@@ -15,26 +15,27 @@ type UploadPluginModalProps = {
     onUpload: (file: File) => void | Promise<void>;
 };
 
-const MINIMAL_MANIFEST_SNIPPET = `{
-  "apiVersion": "yingce.plugin/v1",
-  "id": "my-custom-plugin",
-  "name": "我的自定义插件",
-  "version": "1.0.0",
-  "author": "Developer",
-  "description": "通过统一清单扩展平台功能",
-  "permissions": ["generation.run", "media.read"],
-  "contributes": {
-    "providers": [],
-    "workflows": []
-  }
-}`;
+const MANIFEST_EXAMPLE = pluginDevelopmentGuideMarkdown.match(/```json\s*([\s\S]*?)```/)?.[1].trim();
 
 export function UploadPluginModal({ open, onClose, onUpload }: UploadPluginModalProps) {
+    const { message } = App.useApp();
     const [activeTab, setActiveTab] = useState<"install" | "guide">("install");
     const [isDraggingPlugin, setIsDraggingPlugin] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [copied, setCopied] = useState(false);
     const dragDepth = useRef(0);
+    const uploadInFlight = useRef(false);
+    const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+    useEffect(() => {
+        if (!open) {
+            setActiveTab("install");
+            setIsDraggingPlugin(false);
+            setCopied(false);
+            dragDepth.current = 0;
+        }
+        return () => clearTimeout(copyTimer.current);
+    }, [open]);
 
     const handlePluginDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();
@@ -58,19 +59,30 @@ export function UploadPluginModal({ open, onClose, onUpload }: UploadPluginModal
     };
 
     const handleExecuteUpload = async (file: File) => {
+        if (uploadInFlight.current) return;
+        uploadInFlight.current = true;
         setUploading(true);
         try {
             await onUpload(file);
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "安装插件失败");
         } finally {
+            uploadInFlight.current = false;
             setUploading(false);
         }
     };
 
-    const copySnippet = () => {
-        void navigator.clipboard?.writeText(MINIMAL_MANIFEST_SNIPPET).then(() => {
+    const copySnippet = async () => {
+        try {
+            if (!MANIFEST_EXAMPLE) throw new Error("开发规范中缺少清单示例");
+            if (!navigator.clipboard) throw new Error("当前环境不支持剪贴板，请从开发规范中手动复制");
+            await navigator.clipboard.writeText(MANIFEST_EXAMPLE);
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        });
+            clearTimeout(copyTimer.current);
+            copyTimer.current = setTimeout(() => setCopied(false), 2000);
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "复制失败，请手动复制");
+        }
     };
 
     const isCompact = activeTab === "install";
@@ -83,37 +95,25 @@ export function UploadPluginModal({ open, onClose, onUpload }: UploadPluginModal
             centered
             footer={null}
             destroyOnHidden
+            closable={!uploading}
             mask={{ closable: !uploading }}
             onCancel={uploading ? undefined : onClose}
             styles={{ body: { maxHeight: "min(84vh, 900px)", overflowY: "auto", overscrollBehavior: "contain", padding: "16px 20px 24px" } }}
         >
             <div className="plugin-upload-tabs-bar">
                 <div className="plugin-upload-tabs-nav">
-                    <button
-                        type="button"
-                        className={`plugin-upload-tab-btn ${activeTab === "install" ? "is-active" : ""}`}
-                        onClick={() => setActiveTab("install")}
-                    >
+                    <button type="button" className={`plugin-upload-tab-btn ${activeTab === "install" ? "is-active" : ""}`} aria-pressed={activeTab === "install"} onClick={() => setActiveTab("install")}>
                         <CloudUpload className="size-4" />
                         <span>安装插件包</span>
                     </button>
-                    <button
-                        type="button"
-                        className={`plugin-upload-tab-btn ${activeTab === "guide" ? "is-active" : ""}`}
-                        onClick={() => setActiveTab("guide")}
-                    >
+                    <button type="button" className={`plugin-upload-tab-btn ${activeTab === "guide" ? "is-active" : ""}`} aria-pressed={activeTab === "guide"} onClick={() => setActiveTab("guide")}>
                         <FileText className="size-4" />
                         <span>开发规范与示例</span>
                     </button>
                 </div>
                 {activeTab === "guide" ? (
-                    <button
-                        type="button"
-                        className="plugin-upload-copy-btn"
-                        onClick={copySnippet}
-                        title="复制最小 manifest.json 配置模板"
-                    >
-                        <span>{copied ? "已复制清单" : "复制最小清单"}</span>
+                    <button type="button" className="plugin-upload-copy-btn" onClick={() => void copySnippet()} title="复制开发规范中的 manifest.json 配置示例">
+                        <span>{copied ? "已复制清单" : "复制清单示例"}</span>
                     </button>
                 ) : (
                     <div className="plugin-upload-badge">
@@ -126,7 +126,9 @@ export function UploadPluginModal({ open, onClose, onUpload }: UploadPluginModal
             {activeTab === "install" ? (
                 <div className="plugin-upload-install-view">
                     <div className="plugin-upload-panel-heading">
-                        <span className="plugin-upload-panel-icon"><CloudUpload className="size-5" /></span>
+                        <span className="plugin-upload-panel-icon">
+                            <CloudUpload className="size-5" />
+                        </span>
                         <div>
                             <h2>安装插件包</h2>
                             <p>选择统一站点插件包，安装后会立即进入插件中心。</p>
@@ -204,13 +206,15 @@ export function PluginDetailsModal({ plugin, restoreFocus, onClose }: PluginDeta
     return (
         <Modal
             className="workspace-modal workspace-modal-wide plugin-details-modal"
-            title={plugin ? (
-                <div className="plugin-details-title">
-                    <FileText className="size-4" />
-                    <span>{plugin.manifest.name}</span>
-                    <span className="plugin-version">v{plugin.manifest.version}</span>
-                </div>
-            ) : null}
+            title={
+                plugin ? (
+                    <div className="plugin-details-title">
+                        <FileText className="size-4" />
+                        <span>{plugin.manifest.name}</span>
+                        <span className="plugin-version">v{plugin.manifest.version}</span>
+                    </div>
+                ) : null
+            }
             open={Boolean(plugin)}
             centered
             footer={null}

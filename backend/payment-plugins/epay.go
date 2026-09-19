@@ -1,6 +1,7 @@
 package paymentplugins
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"crypto/subtle"
@@ -18,10 +19,9 @@ import (
 )
 
 const (
-	defaultEpayGateway = "https://pay.admincloudai.com"
-	epayPluginVersion  = "1.0.8"
-	epayQRLifetime     = 10 * time.Minute
-	maxEpayResponse    = 2 << 20
+	epayPluginVersion = "1.0.9"
+	epayQRLifetime    = 10 * time.Minute
+	maxEpayResponse   = 2 << 20
 )
 
 type EpayProvider struct {
@@ -102,7 +102,11 @@ func (p *EpayProvider) CreateOrder(ctx context.Context, config Config, request C
 	if version == "1" {
 		params["method"] = "jump"
 		params["timestamp"] = strconv.FormatInt(p.now().Unix(), 10)
-		params["sign"] = epayRSASign(params, config["privateKey"])
+		signature, err := epayRSASign(params, config["privateKey"])
+		if err != nil {
+			return Checkout{}, &ProviderError{Code: "epay_sign_failed", Message: "易支付请求签名失败", Cause: err}
+		}
+		params["sign"] = signature
 		params["sign_type"] = "RSA"
 		path = "/api/pay/create"
 		successCode = "0"
@@ -137,6 +141,7 @@ func (p *EpayProvider) CreateOrder(ctx context.Context, config Config, request C
 		} else {
 			// urlscheme 是小程序跳转链接，前端直接跳；没有本地收银台时二维码链接也直接跳过去
 			value = firstNonEmpty(epayString(response["payurl"]), epayString(response["urlscheme"]), qrcode)
+			mode = "redirect"
 		}
 	}
 	if !isEpayURL(value) {
@@ -179,7 +184,10 @@ func (p *EpayProvider) QueryOrder(ctx context.Context, config Config, request Qu
 		}
 		return Result{}, &ProviderError{Code: "epay_query_failed", Message: message, Temporary: status >= 500}
 	}
-	return epayResult(response, request.MerchantOrderNo), nil
+	if response["pid"] != "" && response["pid"] != strings.TrimSpace(config["pid"]) {
+		return Result{}, errors.New("易支付查单商户号不匹配")
+	}
+	return epayResult(response, request.MerchantOrderNo)
 }
 
 func (p *EpayProvider) CloseOrder(ctx context.Context, config Config, request CloseRequest) (Result, error) {
@@ -201,8 +209,8 @@ func (p *EpayProvider) CloseOrder(ctx context.Context, config Config, request Cl
 		result.ProviderStatus = "TRADE_CLOSED"
 		return result, nil
 	}
-	// V2 没有通用远程关单接口，只关闭宿主本地订单。
-	return Result{MerchantOrderNo: request.MerchantOrderNo, ProviderStatus: "TRADE_CLOSED", Currency: "CNY", Closed: true}, nil
+	// 未能查证上游状态时不能把未知订单标为已关闭。
+	return Result{}, &ProviderError{Code: "epay_close_unsupported", Message: "易支付 V2 暂不支持查单及安全关单，请在支付网关核对订单"}
 }
 
 func (p *EpayProvider) VerifyNotification(_ context.Context, config Config, _ http.Header, rawBody []byte) (Notification, error) {
@@ -215,9 +223,10 @@ func (p *EpayProvider) VerifyNotification(_ context.Context, config Config, _ ht
 	}
 	values := make(map[string]string, len(params))
 	for key, items := range params {
-		if len(items) > 0 {
-			values[key] = items[0]
+		if len(items) != 1 {
+			return Notification{}, errors.New("易支付异步通知存在重复参数")
 		}
+		values[key] = items[0]
 	}
 	if values["pid"] != strings.TrimSpace(config["pid"]) {
 		return Notification{}, errors.New("易支付异步通知商户号不匹配")
@@ -250,19 +259,25 @@ func (p *EpayProvider) VerifyNotification(_ context.Context, config Config, _ ht
 	}
 
 	amount, err := parseYuanToFen(values["money"])
-	if err != nil {
-		return Notification{}, fmt.Errorf("易支付异步通知金额无效: %w", err)
+	if err != nil || amount <= 0 {
+		return Notification{}, errors.New("易支付异步通知金额无效")
 	}
 	status := strings.TrimSpace(values["trade_status"])
-	paid := status == "TRADE_SUCCESS"
+	// 宿主通知队列只处理到账事件，其他状态不得占用同一流水的幂等键。
+	if status != "TRADE_SUCCESS" {
+		return Notification{}, errors.New("易支付异步通知不是成功状态")
+	}
 	providerTradeNo := firstNonEmpty(values["trade_no"], values["api_trade_no"])
+	if providerTradeNo == "" {
+		return Notification{}, errors.New("易支付成功通知缺少支付流水号")
+	}
 	eventID := firstNonEmpty(values["notify_id"], providerTradeNo, values["out_trade_no"]+":"+status)
 	return Notification{
 		EventID: eventID,
 		Result: Result{
 			MerchantOrderNo: values["out_trade_no"], ProviderTradeNo: providerTradeNo,
 			ProviderStatus: status, AmountFen: amount, Currency: "CNY",
-			Paid: paid, Closed: status == "TRADE_CLOSED", PaidAt: parseEpayTime(firstNonEmpty(values["endtime"], values["gmt_payment"])),
+			Paid: true, PaidAt: parseEpayTime(firstNonEmpty(values["endtime"], values["gmt_payment"])),
 		},
 	}, nil
 }
@@ -322,8 +337,13 @@ func epayJSONResponse(resp *http.Response) (epayResponse, int, error) {
 	}
 	var raw map[string]any
 	// 有的网关输出带 BOM
-	if err := json.Unmarshal([]byte(strings.TrimPrefix(string(body), "\xEF\xBB\xBF")), &raw); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(bytes.TrimPrefix(body, []byte("\xEF\xBB\xBF"))))
+	decoder.UseNumber()
+	if err := decoder.Decode(&raw); err != nil {
 		return nil, resp.StatusCode, &ProviderError{Code: "epay_response_parse_error", Message: "易支付响应不是有效 JSON", Temporary: true, Cause: err}
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return nil, resp.StatusCode, &ProviderError{Code: "epay_response_parse_error", Message: "易支付响应包含多余内容"}
 	}
 	result := make(epayResponse, len(raw))
 	for key, value := range raw {
@@ -335,7 +355,7 @@ func epayJSONResponse(resp *http.Response) (epayResponse, int, error) {
 func epayGateway(config Config) (string, error) {
 	gateway := strings.TrimSpace(config["gateway"])
 	if gateway == "" {
-		gateway = defaultEpayGateway
+		return "", errors.New("易支付配置缺少支付网关 gateway")
 	}
 	parsed, err := url.Parse(gateway)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
@@ -414,35 +434,46 @@ func epayMD5Hex(value string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func epayRSASign(values map[string]string, privateKey string) string {
+func epayRSASign(values map[string]string, privateKey string) (string, error) {
 	key, err := parseRSAPrivateKey(privateKey)
 	if err != nil {
-		return ""
+		return "", err
 	}
-	signature, err := rsaSHA256Sign(key, []byte(epayCanonical(values)))
-	if err != nil {
-		return ""
-	}
-	return signature
+	return rsaSHA256Sign(key, []byte(epayCanonical(values)))
 }
 
 func epaySafetyEquals(actual, expected string) bool {
 	return actual != "" && len(actual) == len(expected) && subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) == 1
 }
 
-func epayResult(response epayResponse, fallbackOrderNo string) Result {
+func epayResult(response epayResponse, expectedOrderNo string) (Result, error) {
 	status := epayString(response["status"])
 	if status == "" && response["trade_status"] != "" {
 		status = response["trade_status"]
 	}
-	amount, _ := parseYuanToFen(firstNonEmpty(epayString(response["money"]), epayString(response["total_amount"])))
+	switch status {
+	case "0", "1", "WAIT_BUYER_PAY", "TRADE_SUCCESS", "TRADE_CLOSED":
+	default:
+		return Result{}, errors.New("易支付查单支付状态缺失或无效")
+	}
+	if response["out_trade_no"] != expectedOrderNo {
+		return Result{}, errors.New("易支付查单订单号缺失或不匹配")
+	}
+	amount, err := parseYuanToFen(firstNonEmpty(response["money"], response["total_amount"]))
+	if err != nil || amount <= 0 {
+		return Result{}, errors.New("易支付查单金额无效")
+	}
+	providerTradeNo := firstNonEmpty(response["trade_no"], response["api_trade_no"])
+	if (status == "1" || status == "TRADE_SUCCESS") && providerTradeNo == "" {
+		return Result{}, errors.New("易支付成功订单缺少支付流水号")
+	}
 	return Result{
-		MerchantOrderNo: firstNonEmpty(epayString(response["out_trade_no"]), fallbackOrderNo),
-		ProviderTradeNo: firstNonEmpty(epayString(response["trade_no"]), epayString(response["api_trade_no"])),
+		MerchantOrderNo: response["out_trade_no"],
+		ProviderTradeNo: providerTradeNo,
 		ProviderStatus:  status, AmountFen: amount, Currency: "CNY",
 		Paid: status == "1" || status == "TRADE_SUCCESS", Closed: status == "TRADE_CLOSED",
 		PaidAt: parseEpayTime(firstNonEmpty(epayString(response["endtime"]), epayString(response["gmt_payment"]))),
-	}
+	}, nil
 }
 
 func epayString(value any) string {
@@ -460,21 +491,20 @@ func epayString(value any) string {
 	}
 }
 
-// 只认带协议头的地址（http(s)，或 weixin:// 这类唤起 App 的），挡掉 javascript: 之类
+// 只允许浏览器支付页和已知支付 App 协议，不接受任意本机协议。
 func isEpayURL(value string) bool {
 	value = strings.TrimSpace(value)
 	parsed, err := url.Parse(value)
-	if err != nil || parsed.Scheme == "" {
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil {
 		return false
 	}
 	scheme := strings.ToLower(parsed.Scheme)
-	if scheme == "javascript" || scheme == "data" || scheme == "vbscript" {
+	switch scheme {
+	case "http", "https", "weixin", "alipay", "alipays", "mqqapi":
+		return true
+	default:
 		return false
 	}
-	if scheme == "http" || scheme == "https" {
-		return parsed.Host != ""
-	}
-	return strings.Contains(value, "://")
 }
 
 func parseEpayTime(value string) time.Time {

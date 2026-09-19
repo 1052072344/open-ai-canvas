@@ -137,6 +137,8 @@ Skills 的 `tool_completed` / `tool_failed` 事件附带 `skillId`、`skillName`
 
 后台支付订单列表展示用户身份，点击名称打开用户详情；订单详情提供完整订单号、渠道交易号、用户 ID 和各阶段时间。同步支付状态与关闭订单位于更多菜单，关闭订单仍需确认。
 
+官方易支付插件 `official-payment-epay` 通过既有支付接口接入，不新增业务路由。管理员必须显式填写可信支付网关；V1 支持 MD5 下单、查单与通知验签，未付款订单的关单仅关闭本地记录。V2 目前只支持 RSA 下单和通知验签，不支持查单、刷新收银台及自动关单；相应操作返回明确失败，不能按“订单已关闭”处理。启用前需在实际网关验收回调和到账，不能用插件安装成功代替支付链路验收。
+
 ### 支付对账筛选及 CSV 导出
 
 `GET /api/admin/payments/reconciliations` 支持 `providerId`、`status`（`running` / `completed` / `failed`）、`from`、`to`（账单日期，包含起止日）、`page`、`pageSize`。`GET /api/admin/payments/reconciliations/:id/items` 支持 `result`、`page`、`pageSize`；`result=abnormal` 同时选出所有非 `matched`、非 `recovered` 明细，未指定或 `all` 表示全部。具体结果还支持 `matched`、`recovered`、`local_order_not_found`、`provider_record_missing`、`amount_mismatch`、`trade_no_mismatch`、`credit_failed`。

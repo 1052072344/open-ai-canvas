@@ -220,4 +220,10 @@ func TestEpayOfficialPackageIsPaymentPlugin(t *testing.T) {
 	if _, ok := provider.(*payment.RPCProvider); !ok {
 		t.Fatalf("epay provider type = %T", provider)
 	}
+	if err := provider.ValidateConfig(payment.Config{"pid": "test-merchant", "key": "test-key"}); err == nil {
+		t.Fatal("packaged epay executable must reject a missing gateway")
+	}
+	if err := provider.ValidateConfig(payment.Config{"pid": "test-merchant", "key": "test-key", "gateway": "https://pay.example"}); err != nil {
+		t.Fatalf("packaged epay executable rejected explicit configuration: %v", err)
+	}
 }

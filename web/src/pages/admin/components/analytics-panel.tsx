@@ -10,14 +10,7 @@ import { Area, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, 
 import { useSearchParams } from "react-router";
 
 import { ListToolbar, PaginationBar, AdminDataTable, AdminExportButton, AdminFilterChip, AdminStatusBadge, AdminTableEmpty, type AdminStatusTone } from "./admin-ui";
-import {
-    exportAdminAnalytics,
-    getAdminAnalytics,
-    listAdminUsers,
-    type AdminReferenceData,
-    type AdminAnalytics,
-    type AnalyticsFilters,
-} from "@/services/api/auth";
+import { exportAdminAnalytics, getAdminAnalytics, listAdminUsers, type AdminReferenceData, type AdminAnalytics, type AnalyticsFilters } from "@/services/api/auth";
 import { analyticsFinanceColumns, formatCredits, formatFinanceCost, formatFinanceMargin } from "./analytics-finance";
 
 type Props = {
@@ -300,11 +293,26 @@ export default function AnalyticsPanel({ users, channels }: Props) {
                 <AnalyticsHealthCard
                     icon={<CircleDollarSign className="size-4" />}
                     label="费用统计（积分）"
-                    value={finance ? <dl className="admin-analytics-finance-values">
-                        <div><dt>收入</dt><dd>{formatCredits(finance.revenueMicrocredits)}</dd></div>
-                        <div><dt>成本</dt><dd>{formatFinanceCost(finance)}</dd></div>
-                        <div><dt>利润</dt><dd>{formatCredits(finance.profitMicrocredits)}</dd></div>
-                    </dl> : "--"}
+                    value={
+                        finance ? (
+                            <dl className="admin-analytics-finance-values">
+                                <div>
+                                    <dt>收入</dt>
+                                    <dd>{formatCredits(finance.revenueMicrocredits)}</dd>
+                                </div>
+                                <div>
+                                    <dt>成本</dt>
+                                    <dd>{formatFinanceCost(finance)}</dd>
+                                </div>
+                                <div>
+                                    <dt>利润</dt>
+                                    <dd>{formatCredits(finance.profitMicrocredits)}</dd>
+                                </div>
+                            </dl>
+                        ) : (
+                            "--"
+                        )
+                    }
                     detail={finance ? `已结算 ${finance.settledOrders} 笔 · 利润率 ${formatFinanceMargin(finance.profitMargin)}` : undefined}
                     tone={finance && (finance.costedOrders < finance.settledOrders || (finance.profitMicrocredits ?? 0) < 0) ? "warning" : "neutral"}
                 />
@@ -390,7 +398,15 @@ export default function AnalyticsPanel({ users, channels }: Props) {
                             icon={<CircleDollarSign className="size-4" />}
                             label="成本覆盖订单"
                             value={finance ? `${finance.costedOrders}/${finance.settledOrders}` : "--"}
-                            description={!finance ? "财务统计尚未返回" : finance.settledOrders ? (finance.costedOrders === finance.settledOrders ? "已结算订单成本完整" : `${finance.settledOrders - finance.costedOrders} 笔缺少成本快照或有效用量`) : "当前范围暂无已结算订单"}
+                            description={
+                                !finance
+                                    ? "财务统计尚未返回"
+                                    : finance.settledOrders
+                                      ? finance.costedOrders === finance.settledOrders
+                                          ? "已结算订单成本完整"
+                                          : `${finance.settledOrders - finance.costedOrders} 笔缺少成本快照或有效用量`
+                                      : "当前范围暂无已结算订单"
+                            }
                             tone={finance && finance.costedOrders < finance.settledOrders ? "warning" : "neutral"}
                             onClick={() => openAnalysis("models")}
                         />
@@ -449,7 +465,6 @@ export default function AnalyticsPanel({ users, channels }: Props) {
                     ]}
                 />
             </section>
-
         </div>
     );
 }
