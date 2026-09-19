@@ -2,8 +2,8 @@ import { nanoid } from "nanoid";
 import { message } from "antd";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasBatchTableData, type CanvasBatchRow } from "@/types/canvas";
 import { runBackendGenerationTask } from "@/services/api/generation-task";
-import { buildGenerationConfig } from "@/lib/canvas/canvas-project-generation";
-import { modelRequestOptions, type ModelRequirements } from "@/lib/model-selection";
+import { buildGenerationConfig, resolveCanvasGenerationModel } from "@/lib/canvas/canvas-project-generation";
+import { modelCompatibilityError, modelRequestOptions, resolveCompatibleModel, type ModelRequirements } from "@/lib/model-selection";
 import type { AiConfig } from "@/stores/use-config-store";
 
 const LIST_MODE_SYSTEM_PROMPT = `你是一个电商内容分析助手。用户会给你多张产品图片和一个任务描述。
@@ -145,14 +145,22 @@ export async function handleListGenerate({
     setRunningNodeId(sourceNodeId);
 
     try {
-        // Ask model selection for a text model that can receive all connected images.
-        const sourceNodeForConfig = { ...sourceNode, metadata: { ...(sourceNode.metadata || {}), model: undefined } };
+        // 列表模式必须沿用文本节点当前选中的模型。此前这里清空 node.metadata.model，
+        // 会退回全局 textModel；当全局模型是普通文本模型时，界面虽显示 Gemini，
+        // 实际请求却会发给不支持图片的旧模型。
         const requirements: ModelRequirements = {
             capability: "text",
             input: { textCount: 1, imageCount: imageNodes.length, videoCount: 0, audioCount: 0, characterCount: 0 },
             options: modelRequestOptions(config, "text"),
         };
-        const listConfig = buildGenerationConfig(config, sourceNodeForConfig, "text", requirements);
+        const preferredModel = resolveCanvasGenerationModel(config, sourceNode.metadata?.model, "text") || resolveCanvasGenerationModel(config, config.textModel, "text");
+        if (!preferredModel) throw new Error("当前没有可用的文本模型，请先在模型设置中选择模型");
+        const compatibleModel = resolveCompatibleModel(config, preferredModel, requirements);
+        if (!compatibleModel || modelCompatibilityError(config, compatibleModel, requirements)) {
+            throw new Error("当前文本模型不支持图片理解，请在节点底部选择支持图片输入的 Gemini 或其他多模态模型");
+        }
+        const sourceNodeForConfig = { ...sourceNode, metadata: { ...(sourceNode.metadata || {}), model: compatibleModel } };
+        const listConfig = { ...buildGenerationConfig(config, sourceNodeForConfig, "text", requirements), model: compatibleModel };
 
         const referenceImages = imageNodes.map((node) => ({
             id: node.id,
