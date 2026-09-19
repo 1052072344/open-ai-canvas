@@ -1,4 +1,4 @@
-import { isCanvasNodeGenerating } from "@/lib/canvas/canvas-node-task-state";
+﻿import { isCanvasNodeGenerating } from "@/lib/canvas/canvas-node-task-state";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -110,6 +110,7 @@ import { TapNowImportDialog } from "./components/tapnow-import-dialog";
 import { CanvasFocusModeBar } from "@/components/canvas/canvas-focus-mode-bar";
 import { CanvasProjectContextMenu } from "./canvas-project-context-menu";
 import { CanvasProjectMediaDialogs } from "./canvas-project-media-dialogs";
+import { BatchGenerationSettingsDialog } from "@/components/canvas/batch-generation-settings-dialog";
 import { CanvasProjectSelectionToolbar } from "./canvas-project-selection-toolbar";
 import { CanvasProjectStatusDialogs } from "./canvas-project-status-dialogs";
 import { CanvasProjectWorldLayers } from "./canvas-project-world-layers";
@@ -1910,7 +1911,7 @@ function InfiniteCanvasPage() {
         handleGenerateNode,
     });
 
-    const { addReferenceColumn: addBatchReferenceColumn, addTextColumn: addBatchTextColumn, addRow: addBatchRow, fillRowsFromConnections, generateRows: generateBatchRows, moveReferenceCell: moveBatchReferenceCell, patchTable: patchBatchTable, removeRow: removeBatchRow, reorderReferenceColumns: reorderBatchReferenceColumns, syncRowsFromConnections, updateRow: updateBatchRow } = useCanvasBatchTable({
+    const { addReferenceColumn: addBatchReferenceColumn, addTextColumn: addBatchTextColumn, addRow: addBatchRow, fillRowsFromConnections, generateRows: generateBatchRows, moveReferenceCell: moveBatchReferenceCell, patchTable: patchBatchTable, removeRow: removeBatchRow, reorderReferenceColumns: reorderBatchReferenceColumns, syncRowsFromConnections, updateRow: updateBatchRow, batchGenDialogOpen, batchGenDialogRowCount, batchGenDialogConcurrency, batchGenDialogConfig, closeBatchGenDialog, confirmBatchGenDialog } = useCanvasBatchTable({
         nodesRef,
         connectionsRef,
         setNodes,
@@ -3174,6 +3175,15 @@ function InfiniteCanvasPage() {
                             onTextEdit={(node, payload) => void editTextImageNode(node, payload)}
                             onUpscale={(node, params) => void upscaleImageNode(node, params)}
                             config={effectiveConfig}
+                        />
+
+                        <BatchGenerationSettingsDialog
+                            open={batchGenDialogOpen}
+                            config={batchGenDialogConfig}
+                            rowCount={batchGenDialogRowCount}
+                            concurrency={batchGenDialogConcurrency}
+                            onClose={closeBatchGenDialog}
+                            onConfirm={confirmBatchGenDialog}
                         />
 
                         <CanvasProjectStatusDialogs

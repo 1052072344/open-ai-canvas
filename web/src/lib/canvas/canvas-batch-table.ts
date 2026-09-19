@@ -1,4 +1,4 @@
-import { nanoid } from "nanoid";
+﻿import { nanoid } from "nanoid";
 
 import type { CanvasBatchOperation, CanvasBatchReferenceColumn, CanvasBatchRow, CanvasBatchTableData, CanvasConnection, CanvasNodeData } from "@/types/canvas";
 
@@ -7,7 +7,7 @@ export const CREATIVE_BATCH_PROMPT = "基于参考图创作一张新的商业图
 export const BATCH_REFERENCE_HANDLE_PREFIX = "batch-reference:";
 export const BATCH_REFERENCE_HANDLE_TOP = 112;
 export const BATCH_REFERENCE_HANDLE_GAP = 38;
-export const MAX_BATCH_REFERENCE_COLUMNS = 6;
+export const MAX_BATCH_REFERENCE_COLUMNS = 10;
 export const MAX_BATCH_TEXT_COLUMNS = 4;
 export const BATCH_TEXT_HANDLE_PREFIX = "batch-text:";
 
@@ -15,7 +15,7 @@ export function batchGridTemplateColumns(referenceCount: number, textCount: numb
     return [
         "36px",
         "68px",
-        `repeat(${referenceCount}, 88px)`,
+        `repeat(\${referenceCount}, 72px)`,
         textCount > 0 ? `repeat(${textCount}, minmax(168px, 0.75fr))` : undefined,
         "minmax(280px, 1fr)",
         "148px",

@@ -1,14 +1,15 @@
-import { useCallback, type Dispatch, type SetStateAction } from "react";
+﻿import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { App } from "antd";
 import { nanoid } from "nanoid";
 
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
-import { batchInputColumns, batchPromptForRow, batchReferenceColumns, batchTextInputColumns, createBatchRow, createBatchRowsFromColumns, moveBatchReferenceCell, reorderBatchReferenceColumns } from "@/lib/canvas/canvas-batch-table";
+import { MAX_BATCH_REFERENCE_COLUMNS, batchInputColumns, batchPromptForRow, batchReferenceColumns, batchTextInputColumns, createBatchRow, createBatchRowsFromColumns, moveBatchReferenceCell, reorderBatchReferenceColumns } from "@/lib/canvas/canvas-batch-table";
 import { createCanvasNode } from "@/lib/canvas/canvas-project-domain";
 import { buildGenerationConfig, resetGenerationTaskMetadata } from "@/lib/canvas/canvas-project-generation";
 import { navigateToSettings } from "@/lib/settings-navigation";
-import { modelDisplayName, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { CanvasNodeType, type CanvasBatchRow, type CanvasBatchTableData, type CanvasConnection, type CanvasGenerationBatchMode, type CanvasNodeData } from "@/types/canvas";
+import type { BatchGenerationSettings } from "@/components/canvas/batch-generation-settings-dialog";
 
 type Options = {
     nodesRef: { current: CanvasNodeData[] };
@@ -19,10 +20,18 @@ type Options = {
     enqueueGenerationBatch: (sourceNodeId: string, mode: CanvasGenerationBatchMode, targets: Array<{ rowId: string; nodeId: string }>, options?: { concurrency?: number }) => string | undefined;
 };
 
+type PendingBatchGen = {
+    nodeId: string;
+    rows: CanvasBatchRow[];
+    concurrency: number;
+};
+
 export function useCanvasBatchTable({ nodesRef, connectionsRef, setNodes, setConnections, setSelectedNodeIds, enqueueGenerationBatch }: Options) {
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp();
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
+
+    const [batchGenDialog, setBatchGenDialog] = useState<{ open: boolean; pending: PendingBatchGen | null }>({ open: false, pending: null });
 
     const patchTable = useCallback((nodeId: string, patch: Partial<CanvasBatchTableData>) => {
         setNodes((current) => current.map((node) => node.id !== nodeId ? node : { ...node, metadata: { ...node.metadata, batchTable: { operation: "try_on", concurrency: 3, rows: [], ...node.metadata?.batchTable, ...patch } } }));
@@ -50,7 +59,7 @@ export function useCanvasBatchTable({ nodesRef, connectionsRef, setNodes, setCon
         const table = nodesRef.current.find((item) => item.id === nodeId)?.metadata?.batchTable;
         if (!table) return;
         const columns = batchReferenceColumns(table);
-        if (columns.length >= 6) return message.info("最多支持 6 组参考图");
+        if (columns.length >= MAX_BATCH_REFERENCE_COLUMNS) return message.info("最多支持 10 组参考图");
         const nextIndex = columns.length + 1;
         patchTable(nodeId, { referenceColumns: [...columns, { id: `reference-${nanoid()}`, label: `参考图 ${nextIndex}` }] });
     }, [message, nodesRef, patchTable]);
@@ -117,35 +126,13 @@ export function useCanvasBatchTable({ nodesRef, connectionsRef, setNodes, setCon
         if (nextTable !== table) patchTable(nodeId, { rows: nextTable.rows });
     }, [nodesRef, patchTable]);
 
-    const generateRows = useCallback(async (nodeId: string, requestedRowIds?: string[]) => {
+    const executeBatchGeneration = useCallback((pending: PendingBatchGen, settings: BatchGenerationSettings) => {
+        const { nodeId, rows, concurrency } = pending;
         const sourceNode = nodesRef.current.find((item) => item.id === nodeId);
         const table = sourceNode?.metadata?.batchTable;
         if (!sourceNode || !table) return;
-        const imageModel = effectiveConfig.imageModel || effectiveConfig.model;
-        if (!isAiConfigReady(effectiveConfig, imageModel)) {
-            navigateToSettings({ continueCreation: true });
-            return;
-        }
-        const activeNodeIds = new Set((sourceNode.metadata?.generationBatches || []).filter((batch) => batch.mode === "batch_image").flatMap((batch) => batch.items.filter((item) => ["waiting", "submitting", "queued", "running"].includes(item.status)).map((item) => item.nodeId)));
-        const requested = requestedRowIds?.length ? new Set(requestedRowIds) : null;
-        const rows = table.rows.filter((row) => {
-            if (row.enabled === false || (requested && !requested.has(row.id)) || !batchPromptForRow(table, row).trim()) return false;
-            if (table.operation === "try_on" && row.inputNodeIds.length < 2) return false;
-            if (!row.inputNodeIds.length || row.inputNodeIds.some((id) => !nodesRef.current.some((node) => node.id === id && node.type === CanvasNodeType.Image && Boolean(node.metadata?.content || node.metadata?.storageKey)))) return false;
-            const output = row.outputNodeId ? nodesRef.current.find((node) => node.id === row.outputNodeId) : undefined;
-            return !output?.metadata?.content && (!output || !activeNodeIds.has(output.id));
-        });
-        if (!rows.length) return message.info("没有可提交的未完成任务，请检查参考图和提示词");
-        const confirmed = await new Promise<boolean>((resolve) => modal.confirm({
-            title: `确认提交 ${rows.length} 个批量图片任务`,
-            content: `模型：${modelDisplayName(effectiveConfig, imageModel)}；并发上限：${table.concurrency}。这些任务可能消耗积分或产生外部模型费用。`,
-            okText: "确认生成",
-            cancelText: "取消",
-            centered: true,
-            onOk: () => resolve(true),
-            onCancel: () => resolve(false),
-        }));
-        if (!confirmed) return;
+
+        const mergedConfig = { ...effectiveConfig, ...settings };
 
         const imageSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
         const nextNodes = [...nodesRef.current];
@@ -162,7 +149,11 @@ export function useCanvasBatchTable({ nodesRef, connectionsRef, setNodes, setCon
                     const textNode = nodesRef.current.find((node) => node.id === textNodeId);
                     return textNode?.metadata?.content || textNode?.metadata?.prompt || "";
                 })].filter(Boolean).join("\n\n"),
-                model: buildGenerationConfig(effectiveConfig, undefined, "image").model,
+                model: buildGenerationConfig(mergedConfig, undefined, "image").model,
+                size: mergedConfig.size,
+                quality: mergedConfig.quality,
+                transparentBackground: mergedConfig.transparentBackground,
+                count: Number(mergedConfig.count) || 1,
                 generationMode: "image" as const,
                 generationType: "edit" as const,
                 workflowKind: "final" as const,
@@ -192,8 +183,62 @@ export function useCanvasBatchTable({ nodesRef, connectionsRef, setNodes, setCon
         setNodes(nextNodes);
         setConnections(nextConnections);
         setSelectedNodeIds(new Set(targets.map((target) => target.nodeId)));
-        if (enqueueGenerationBatch(nodeId, "batch_image", targets, { concurrency: table.concurrency })) message.success(`${targets.length} 个任务已加入并发队列`);
-    }, [connectionsRef, effectiveConfig, enqueueGenerationBatch, isAiConfigReady, message, modal, nodesRef, setConnections, setNodes, setSelectedNodeIds]);
+        if (enqueueGenerationBatch(nodeId, "batch_image", targets, { concurrency })) message.success(`${targets.length} 个任务已加入并发队列`);
+    }, [connectionsRef, effectiveConfig, enqueueGenerationBatch, message, nodesRef, setConnections, setNodes, setSelectedNodeIds]);
 
-    return { addReferenceColumn, addTextColumn, addRow, fillRowsFromConnections, generateRows, moveReferenceCell, patchTable, removeRow, reorderReferenceColumns, syncRowsFromConnections, updateRow };
+    const generateRows = useCallback((nodeId: string, requestedRowIds?: string[]) => {
+        const sourceNode = nodesRef.current.find((item) => item.id === nodeId);
+        const table = sourceNode?.metadata?.batchTable;
+        if (!sourceNode || !table) return;
+        const imageModel = effectiveConfig.imageModel || effectiveConfig.model;
+        if (!isAiConfigReady(effectiveConfig, imageModel)) {
+            navigateToSettings({ continueCreation: true });
+            return;
+        }
+        const activeNodeIds = new Set((sourceNode.metadata?.generationBatches || []).filter((batch) => batch.mode === "batch_image").flatMap((batch) => batch.items.filter((item) => ["waiting", "submitting", "queued", "running"].includes(item.status)).map((item) => item.nodeId)));
+        const requested = requestedRowIds?.length ? new Set(requestedRowIds) : null;
+        const rows = table.rows.filter((row) => {
+            if (row.enabled === false || (requested && !requested.has(row.id)) || !batchPromptForRow(table, row).trim()) return false;
+            if (table.operation === "try_on" && row.inputNodeIds.length < 2) return false;
+            if (!row.inputNodeIds.length || row.inputNodeIds.some((id) => !nodesRef.current.some((node) => node.id === id && node.type === CanvasNodeType.Image && Boolean(node.metadata?.content || node.metadata?.storageKey)))) return false;
+            const output = row.outputNodeId ? nodesRef.current.find((node) => node.id === row.outputNodeId) : undefined;
+            return !output?.metadata?.content && (!output || !activeNodeIds.has(output.id));
+        });
+        if (!rows.length) return message.info("没有可提交的未完成任务，请检查参考图和提示词");
+
+        setBatchGenDialog({ open: true, pending: { nodeId, rows, concurrency: table.concurrency } });
+    }, [effectiveConfig, isAiConfigReady, message, nodesRef]);
+
+    const closeBatchGenDialog = useCallback(() => {
+        setBatchGenDialog({ open: false, pending: null });
+    }, []);
+
+    const confirmBatchGenDialog = useCallback((settings: BatchGenerationSettings) => {
+        if (batchGenDialog.pending) {
+            executeBatchGeneration(batchGenDialog.pending, settings);
+        }
+        setBatchGenDialog({ open: false, pending: null });
+    }, [batchGenDialog.pending, executeBatchGeneration]);
+
+    const dialogConfig = useMemo(() => effectiveConfig, [effectiveConfig]);
+
+    return {
+        addReferenceColumn,
+        addTextColumn,
+        addRow,
+        fillRowsFromConnections,
+        generateRows,
+        moveReferenceCell,
+        patchTable,
+        removeRow,
+        reorderReferenceColumns,
+        syncRowsFromConnections,
+        updateRow,
+        batchGenDialogOpen: batchGenDialog.open,
+        batchGenDialogRowCount: batchGenDialog.pending?.rows.length ?? 0,
+        batchGenDialogConcurrency: batchGenDialog.pending?.concurrency ?? 1,
+        batchGenDialogConfig: dialogConfig,
+        closeBatchGenDialog,
+        confirmBatchGenDialog,
+    };
 }
