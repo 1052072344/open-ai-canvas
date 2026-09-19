@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 26
+const CurrentSchemaVersion int64 = 27
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -92,6 +92,27 @@ var schemaMigrations = []migration{
 	{version: 24, name: "channel_model_label", checksum: "sha256:channel-model-label-v24", apply: migrateChannelModelLabel},
 	{version: 25, name: "video_token_formula_snapshot", checksum: "sha256:video-token-formula-snapshot-v25", apply: migrateVideoTokenFormulaSnapshot},
 	{version: 26, name: "channel_model_description", checksum: "sha256:channel-model-description-v26", apply: migrateChannelModelDescription},
+	{version: 27, name: "channel_credit_cost", checksum: "sha256:channel-credit-cost-v27", apply: migrateChannelCreditCost},
+}
+
+func migrateChannelCreditCost(tx *gorm.DB) error {
+	for _, entity := range []any{&model.ChannelModelPriceTier{}, &model.BillingOrder{}} {
+		for _, column := range []string{"cost_configured", "cost_unit_price_microcredits", "cost_input_token_price_microcredits", "cost_output_token_price_microcredits", "cost_cached_token_price_microcredits"} {
+			if !tx.Migrator().HasColumn(entity, column) {
+				if err := tx.Migrator().AddColumn(entity, column); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	for _, column := range []string{"CostBillingMode", "CostQuantity", "CostVideoFormulaTokens"} {
+		if !tx.Migrator().HasColumn(&model.BillingOrder{}, column) {
+			if err := tx.Migrator().AddColumn(&model.BillingOrder{}, column); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func migrateChannelModelDescription(tx *gorm.DB) error {
