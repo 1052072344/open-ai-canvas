@@ -207,9 +207,13 @@ func legacyImageSizeValues() []string {
 }
 
 func DefaultModelCapabilityConfigForModel(protocol string, modelName string) *ModelCapabilityConfig {
-	// 文本模型是否支持视觉输入不能从协议或模型名可靠推断，默认关闭，由管理员按真实上游能力开启。
 	streaming := true
-	text := &TextCapabilityConfig{Streaming: &streaming, References: TextReferenceConfig{PromptMaxChars: 32000}}
+	textReferences := TextReferenceConfig{PromptMaxChars: 32000}
+	if isKnownMultimodalTextModel(protocol, modelName) {
+		textReferences.MaxImages = 16
+		textReferences.MaxImageBytes = 30 * 1024 * 1024
+	}
+	text := &TextCapabilityConfig{Streaming: &streaming, References: textReferences}
 	video := &VideoCapabilityConfig{
 		References:        VideoReferenceConfig{PromptMaxChars: DefaultVideoPromptMaxChars, MinImages: 0, MaxImages: 9, MaxImageBytes: 30 * 1024 * 1024, MaxVideos: 0, MaxVideoBytes: 0, MaxVideoDuration: 0, MaxAudios: 0, MaxAudioBytes: 0, MaxAudioDuration: 0},
 		Duration:          VideoDurationConfig{Selection: "range", Min: 1, Max: 15, Step: 1, Default: 6},
@@ -275,6 +279,11 @@ func DefaultModelCapabilityConfigForModel(protocol string, modelName string) *Mo
 	return &ModelCapabilityConfig{Version: 1, Text: text, Image: DefaultImageCapabilityConfig(protocol, modelName), Video: video}
 }
 
+func isKnownMultimodalTextModel(protocol string, modelName string) bool {
+	model := strings.ToLower(strings.TrimSpace(modelName))
+	return strings.Contains(model, "gemini") || strings.Contains(model, "gpt") || strings.Contains(model, "doubao") || strings.Contains(model, "豆包") || strings.EqualFold(strings.TrimSpace(protocol), "gemini")
+}
+
 func DecodeModelCapabilityConfig(raw string) (*ModelCapabilityConfig, error) {
 	if strings.TrimSpace(raw) == "" {
 		return nil, nil
@@ -323,6 +332,14 @@ func NormalizeModelCapabilityConfigForModel(capability string, protocol string, 
 			return nil, BadAuthRequest("请配置文本模型能力参数")
 		}
 		text := *input.Text
+		if isKnownMultimodalTextModel(protocol, modelName) && text.References.MaxImages == 0 {
+			// 旧配置是在文本模型默认不接收图片时生成的；Gemini 文本模型
+			// 通过兼容协议仍然会接收图片 parts，因此自动修复旧的 0 上限。
+			text.References.MaxImages = 16
+			if text.References.MaxImageBytes == 0 {
+				text.References.MaxImageBytes = 30 * 1024 * 1024
+			}
+		}
 		if text.Streaming == nil {
 			streaming := true
 			text.Streaming = &streaming

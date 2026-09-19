@@ -6,6 +6,23 @@ import (
 	"testing"
 )
 
+func TestDefaultModelCapabilityConfigRecognizesKnownTextVisionFamilies(t *testing.T) {
+	gemini := DefaultModelCapabilityConfigForModel("chat-completion", "gemini-3.8-flash-high")
+	gpt := DefaultModelCapabilityConfigForModel("chat-completion", "gpt-4o")
+	doubao := DefaultModelCapabilityConfigForModel("chat-completion", "doubao-seed-1.6-flash")
+	plain := DefaultModelCapabilityConfigForModel("chat-completion", "plain-text-model")
+
+	if gemini.Text == nil || gemini.Text.References.MaxImages != 16 || gemini.Text.References.MaxImageBytes != 30*1024*1024 {
+		t.Fatalf("Gemini text vision defaults = %#v", gemini.Text)
+	}
+	if gpt.Text == nil || gpt.Text.References.MaxImages != 16 || doubao.Text == nil || doubao.Text.References.MaxImages != 16 {
+		t.Fatalf("known multimodal text vision defaults: gpt=%#v doubao=%#v", gpt.Text, doubao.Text)
+	}
+	if plain.Text == nil || plain.Text.References.MaxImages != 0 {
+		t.Fatalf("plain text vision defaults = %#v", plain.Text)
+	}
+}
+
 func TestValidateImageTaskRejectsOversizedGrokPromptByUTF8Bytes(t *testing.T) {
 	prompt := strings.Repeat("中", 4001)
 	input := canvasGenerationInput{

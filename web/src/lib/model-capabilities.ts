@@ -105,6 +105,14 @@ export const STANDARD_IMAGE_SIZE_VALUES = [
     "1024x1536",
 ] as const;
 
+const DEFAULT_TEXT_REFERENCE_MAX_IMAGES = 16;
+
+function isKnownMultimodalTextModel(protocol?: ModelProtocol, model = "") {
+    // These model families currently expose vision through their text/chat
+    // endpoint, including when they are wrapped by an OpenAI-compatible gateway.
+    return /gemini|gpt|doubao|豆包/i.test(model) || protocol === "gemini";
+}
+
 export function normalizeCapabilityString(value: string) {
     const normalized = value.trim();
     return normalized.startsWith("string:") ? normalized.slice("string:".length) : normalized;
@@ -286,8 +294,13 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
 export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = ""): ModelCapabilityConfig {
     const text: TextCapabilityConfig = {
         streaming: true,
-        // 文本模型的视觉能力必须由管理员明确开启，不能根据模型名猜测。
-        references: { promptMaxChars: 32000, maxImages: 0, maxImageBytes: 0, maxVideos: 0, maxVideoBytes: 0 },
+        references: {
+            promptMaxChars: 32000,
+            maxImages: isKnownMultimodalTextModel(protocol, model) ? DEFAULT_TEXT_REFERENCE_MAX_IMAGES : 0,
+            maxImageBytes: isKnownMultimodalTextModel(protocol, model) ? 30 * 1024 * 1024 : 0,
+            maxVideos: 0,
+            maxVideoBytes: 0,
+        },
     };
     const video: VideoCapabilityConfig = {
         references: {
@@ -398,7 +411,10 @@ export function modelCapabilityConfigFor(config: { channels: Array<{ id: string;
     const fallback = defaultModelCapabilityConfig(cost?.protocol, modelName);
     if (!cost?.capabilityConfig) return fallback;
     const capabilityConfig = normalizeModelCapabilityConfig(cost.capabilityConfig);
-    const text = capabilityConfig.text ? { ...fallback.text!, ...capabilityConfig.text, references: { ...fallback.text!.references, ...capabilityConfig.text.references } } : fallback.text;
+    const mergedText = capabilityConfig.text ? { ...fallback.text!, ...capabilityConfig.text, references: { ...fallback.text!.references, ...capabilityConfig.text.references } } : fallback.text;
+    const text = mergedText && isKnownMultimodalTextModel(cost?.protocol, modelName) && mergedText.references.maxImages === 0
+        ? { ...mergedText, references: { ...mergedText.references, maxImages: DEFAULT_TEXT_REFERENCE_MAX_IMAGES, maxImageBytes: mergedText.references.maxImageBytes || 30 * 1024 * 1024 } }
+        : mergedText;
     const video = capabilityConfig.video ? { ...fallback.video!, ...capabilityConfig.video, references: { ...fallback.video!.references, ...capabilityConfig.video.references } } : fallback.video;
     const configuredImage = capabilityConfig.image;
     const image = configuredImage

@@ -31,3 +31,16 @@ test("raising the video default leaves text and image limits untouched", () => {
     assert.equal(profile.text!.references.promptMaxChars, 32000);
     assert.equal(profile.image!.references.promptMaxChars, 32000);
 });
+
+test("known multimodal text model families default to image input", () => {
+    const gemini = defaultModelCapabilityConfig("chat-completion", "gemini-3.8-flash-high").text!;
+    const gpt = defaultModelCapabilityConfig("chat-completion", "gpt-4o").text!;
+    const doubao = defaultModelCapabilityConfig("chat-completion", "doubao-seed-1.6-flash").text!;
+    const plain = defaultModelCapabilityConfig("chat-completion", "plain-text-model").text!;
+
+    assert.equal(gemini.references.maxImages, 16);
+    assert.equal(gemini.references.maxImageBytes, 30 * 1024 * 1024);
+    assert.equal(gpt.references.maxImages, 16);
+    assert.equal(doubao.references.maxImages, 16);
+    assert.equal(plain.references.maxImages, 0);
+});
