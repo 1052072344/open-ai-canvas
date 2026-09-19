@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Button, Input, Select, Switch, Tooltip } from "antd";
-import { GripVertical, Image as ImageIcon, LoaderCircle, Play, Plus, RefreshCw, Rows3, Trash2, Upload } from "lucide-react";
+import { GripVertical, Image as ImageIcon, LoaderCircle, Play, Plus, RefreshCw, Rows3, Trash2, Upload, X } from "lucide-react";
 
 import { CachedResourceImage } from "@/components/cached-resource-image";
 import { BATCH_REFERENCE_HANDLE_GAP, BATCH_REFERENCE_HANDLE_TOP, MAX_BATCH_REFERENCE_COLUMNS, MAX_BATCH_TEXT_COLUMNS, batchGridTemplateColumns, batchPromptForRow, batchReferenceColumns, batchReferenceHandleId, batchTextColumns, batchTextHandleId, batchTextHandleTop } from "@/lib/canvas/canvas-batch-table";
@@ -59,7 +59,6 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
     const dragStartRef = useRef<{ x: number; y: number; pointerId: number; cell: ReferenceCell } | null>(null);
     const lastPointerRef = useRef({ x: 0, y: 0 });
     const hoveredCellRef = useRef<ReferenceCell | null>(null);
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; cell: ReferenceCell } | null>(null);
     const suppressClickRef = useRef(false);
     const uploadTargetRef = useRef<{ rowId: string; columnIndex: number } | null>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -168,13 +167,6 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
         return () => window.removeEventListener("keydown", handleKeyDown, true);
     }, [readOnly, onRemoveReference]);
 
-    // Hide context menu on outside click
-    useEffect(() => {
-        if (!contextMenu) return;
-        const hide = () => setContextMenu(null);
-        window.addEventListener("pointerdown", hide);
-        return () => window.removeEventListener("pointerdown", hide);
-    }, [contextMenu]);
 
     const handleReferencePointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>, rowId: string, columnIndex: number, hasMaterial: boolean) => {
         if (readOnly || !hasMaterial) return;
@@ -323,7 +315,6 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
                                         hoveredCellRef={hoveredCellRef}
                                         onReplace={onReplaceReference}
                                         onRemove={() => onRemoveReference(row.id, columnIndex)}
-                                        onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, cell: { rowId: row.id, columnIndex } }); }}
                                         onUpload={() => { uploadTargetRef.current = { rowId: row.id, columnIndex }; uploadInputRef.current?.click(); }}
                                         onPointerDown={handleReferencePointerDown}
                                         onPointerMove={handleReferencePointerMove}
@@ -381,23 +372,6 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
                     <div className="grid h-40 place-items-center px-5 text-center" style={{ color: theme.node.muted }}>连接图片后会自动生成任务；点击缩略图可替换素材，拖动参考图列可调整顺序。</div>
                 )}
             </div>
-            {contextMenu ? (
-                <div
-                    className="fixed z-50 min-w-[120px] rounded-lg border py-1 shadow-lg"
-                    style={{ left: contextMenu.x, top: contextMenu.y, background: theme.node.panel, borderColor: theme.node.stroke }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                >
-                    <button
-                        type="button"
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:opacity-70"
-                        style={{ color: "#ef4444" }}
-                        onClick={() => { onRemoveReference(contextMenu.cell.rowId, contextMenu.cell.columnIndex); setContextMenu(null); }}
-                    >
-                        <Trash2 className="size-3.5" />
-                        删除素材
-                    </button>
-                </div>
-            ) : null}
         </div>
     );
 }
@@ -544,7 +518,7 @@ function TextNodeCell({ node, theme }: { node?: CanvasNodeData; theme: CanvasThe
     return <div className="min-h-12 max-w-full overflow-hidden rounded border px-2 py-1.5 text-[11px] leading-4" style={{ borderColor: theme.node.stroke, color: content ? theme.node.text : theme.node.placeholder }} title={content || "未连接文字节点"}>{content || "未连接文字"}</div>;
 }
 
-function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnId, draggingColumnId, isDraggingCell, isDropTarget, suppressClickRef, hoveredCellRef, onReplace, onRemove, onContextMenu, onUpload, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onLostPointerCapture }: {
+function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnId, draggingColumnId, isDraggingCell, isDropTarget, suppressClickRef, hoveredCellRef, onReplace, onRemove, onUpload, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onLostPointerCapture }: {
     node?: CanvasNodeData;
     theme: CanvasTheme;
     readOnly: boolean;
@@ -558,7 +532,6 @@ function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnI
     hoveredCellRef: MutableRefObject<ReferenceCell | null>;
     onReplace: (node: CanvasNodeData) => void;
     onRemove: () => void;
-    onContextMenu: (event: ReactMouseEvent) => void;
     onUpload: () => void;
     onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>, rowId: string, columnIndex: number, hasMaterial: boolean) => void;
     onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -580,7 +553,6 @@ function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnI
                     onClick={(event) => { event.stopPropagation(); if (!suppressClickRef.current) onUpload(); }}
                     onMouseEnter={() => { hoveredCellRef.current = { rowId, columnIndex }; }}
                     onMouseLeave={() => { if (hoveredCellRef.current?.rowId === rowId && hoveredCellRef.current?.columnIndex === columnIndex) hoveredCellRef.current = null; }}
-                    onContextMenu={onContextMenu}
                     aria-label={`${columnId}，点击上传图片`}
                     {...cellData}
                     onPointerDown={(event) => onPointerDown(event, rowId, columnIndex, false)}
@@ -608,7 +580,6 @@ function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnI
                 onClick={(event) => { event.stopPropagation(); if (!readOnly && !draggingColumnId && !suppressClickRef.current) onReplace(node); }}
                 onMouseEnter={() => { hoveredCellRef.current = { rowId, columnIndex }; }}
                 onMouseLeave={() => { if (hoveredCellRef.current?.rowId === rowId && hoveredCellRef.current?.columnIndex === columnIndex) hoveredCellRef.current = null; }}
-                onContextMenu={onContextMenu}
                 {...cellData}
                 onPointerDown={(event) => onPointerDown(event, rowId, columnIndex, true)}
                 onPointerMove={onPointerMove}
@@ -619,6 +590,17 @@ function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnI
             >
                 <CachedResourceImage draggable={false} eager src={node.metadata.previewContent || node.metadata.content} storageKey={node.metadata.storageKey} alt={node.title || "参考图"} className="size-16 select-none object-cover" fallback={fallback} />
                 {!readOnly ? <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/55 px-1 py-1 text-[9px] text-white opacity-0 transition-opacity group-hover:opacity-100"><Upload className="size-3" />替换</span> : null}
+                {!readOnly ? (
+                    <button
+                        type="button"
+                        aria-label="删除素材"
+                        className="absolute right-0.5 top-0.5 grid size-4 place-items-center rounded-full bg-black/60 text-white opacity-0 transition-opacity hover:!opacity-100 group-hover:opacity-100"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); onRemove(); }}
+                    >
+                        <X className="size-3" />
+                    </button>
+                ) : null}
             </button>
         </Tooltip>
     );
