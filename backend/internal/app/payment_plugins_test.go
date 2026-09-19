@@ -186,3 +186,38 @@ func TestZhiFuFMOfficialPackageIsPaymentPlugin(t *testing.T) {
 		t.Fatalf("zhifufm provider type = %T", provider)
 	}
 }
+
+func TestEpayOfficialPackageIsPaymentPlugin(t *testing.T) {
+	center, err := newPluginRuntime(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plugin PluginView
+	for _, item := range center.list() {
+		if item.Manifest.ID == "official-payment-epay" {
+			plugin = item
+			plugin.Management = pluginManagementFromView(item)
+			break
+		}
+	}
+	if plugin.Manifest.ID == "" {
+		t.Fatal("official-payment-epay is missing")
+	}
+	if plugin.Management.Kind != PluginKindPayment || plugin.Source != PluginOriginOfficial {
+		t.Fatalf("epay plugin = %#v", plugin)
+	}
+	if len(plugin.Manifest.Contributes.PaymentProviders) != 1 || plugin.Manifest.Contributes.PaymentProviders[0].ID != "epay" {
+		t.Fatalf("epay contributions = %#v", plugin.Manifest.Contributes.PaymentProviders)
+	}
+	registry := center.paymentRegistrySnapshot()
+	if registry == nil {
+		t.Fatal("payment registry is nil")
+	}
+	provider, ok := registry.Get("epay")
+	if !ok {
+		t.Fatal("epay provider is missing")
+	}
+	if _, ok := provider.(*payment.RPCProvider); !ok {
+		t.Fatalf("epay provider type = %T", provider)
+	}
+}
