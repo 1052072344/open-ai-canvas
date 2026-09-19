@@ -373,10 +373,18 @@
     white-space: nowrap;
 }
 
-/* 面板宽度包含内边距；默认 448px 面板的输入区已不足以同时容纳控制区和快捷键提示。 */
+/* 面板宽度包含内边距；默认 448px 面板放不下完整快捷键说明，窄态降级为短文案而不是隐藏提示本身。 */
+.agent-composer-send-hint .agent-composer-send-hint-compact {
+    display: none;
+}
+
 @container (max-width: 520px) {
-    .agent-composer-send-hint {
+    .agent-composer-send-hint .agent-composer-send-hint-full {
         display: none;
+    }
+
+    .agent-composer-send-hint .agent-composer-send-hint-compact {
+        display: inline;
     }
 }
 
