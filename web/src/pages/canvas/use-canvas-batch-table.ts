@@ -90,6 +90,9 @@ export function useCanvasBatchTable({ nodesRef, connectionsRef, setNodes, setCon
         const node = nodesRef.current.find((item) => item.id === nodeId);
         const table = node?.metadata?.batchTable;
         if (!node || !table) return false;
+        // AI 列表模式已经根据用户要求生成了独立行；参考图连线只负责
+        // 提供素材，不能在保存/连线刷新时把 N 行重置成“每张图一行”。
+        if (table.aiGenerated) return false;
         const nodeById = new Map(nodesRef.current.map((item) => [item.id, item]));
         const columns = batchInputColumns(node, connectionsRef.current).map((column) => column.filter((inputNodeId) => {
             const input = nodeById.get(inputNodeId);

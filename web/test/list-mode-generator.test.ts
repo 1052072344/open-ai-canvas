@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseListModeJson } from "@/pages/canvas/list-mode-generator";
+import { parseListModeJson, requestedListRowCount } from "@/pages/canvas/list-mode-generator";
+
+test("extracts the requested row count from natural language", () => {
+    expect(requestedListRowCount("帮我生成5个卖点")).toBe(5);
+    expect(requestedListRowCount("请写十条小红书标题")).toBe(10);
+    expect(requestedListRowCount("分析这张图")).toBeUndefined();
+});
 
 describe("list mode response parsing", () => {
     test("parses plain JSON", () => {

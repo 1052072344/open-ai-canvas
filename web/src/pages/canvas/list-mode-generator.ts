@@ -6,8 +6,8 @@ import { buildGenerationConfig, resolveCanvasGenerationModel } from "@/lib/canva
 import { modelCompatibilityError, modelRequestOptions, resolveCompatibleModel, type ModelRequirements } from "@/lib/model-selection";
 import type { AiConfig } from "@/stores/use-config-store";
 
-const LIST_MODE_SYSTEM_PROMPT = `你是一个电商内容分析助手。用户会给你多张产品图片和一个任务描述。
-请分析每张图片，为每张图片生成一行数据。
+const LIST_MODE_SYSTEM_PROMPT = `你是一个电商内容分析助手。用户会给你产品图片和一个任务描述。
+请严格根据用户要求的数量生成数据；如果用户说“生成5个卖点”，就必须返回5行，每行一个独立卖点。
 
 输出严格为以下 JSON 格式（不要输出其他内容）：
 {
@@ -20,15 +20,34 @@ const LIST_MODE_SYSTEM_PROMPT = `你是一个电商内容分析助手。用户�
 规则：
 1. 第一列不需要输出（它是图片本身），从第二列开始定义分析维度
 2. 列名根据任务需求自动决定（如：核心卖点、视觉细节、文案标题、搭配建议等）
-3. 每张图片对应一行，rows 数量等于图片数量
-4. 每个单元格内容简洁有力，适合电商/社交媒体使用
-5. 列数建议 3-6 列，根据任务复杂度决定
-6. 只输出 JSON，不要有任何其他文字`;
+3. 用户明确要求数量时，rows 数量必须严格等于目标数量；一行只表达一个独立任务或卖点
+4. 用户没有明确数量时，多张图片默认每张图片一行
+5. 每个单元格内容简洁有力，适合电商/社交媒体使用
+6. 不要把多个编号卖点塞进一个单元格；不要把整段分析只放进“任务提示词”
+7. 列数建议 3-6 列，根据任务复杂度决定
+8. 只输出 JSON，不要有任何其他文字`;
 
 type ListGenerationResult = {
     columns: string[];
     rows: Record<string, string>[];
 };
+
+export function requestedListRowCount(prompt: string): number | undefined {
+    const match = prompt.match(/(?:生成|写|列出|提供|给我|帮我)?[^\n]{0,12}?(\d+|[零〇一二两三四五六七八九十百]+)\s*(?:个|条|项|行|款|种)(?:卖点|标题|文案|内容|任务|要点)?/i);
+    if (!match) return undefined;
+    const value = /^\d+$/.test(match[1]) ? Number(match[1]) : chineseNumber(match[1]);
+    return Number.isInteger(value) && value > 0 ? Math.min(value, 100) : undefined;
+}
+
+function chineseNumber(value: string) {
+    const digits: Record<string, number> = { 零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+    if (value === "十") return 10;
+    if (value.startsWith("十")) return 10 + (digits[value[1]] || 0);
+    if (value.length === 2 && value[1] === "十") return (digits[value[0]] || 0) * 10;
+    if (value.length === 3 && value[1] === "十") return (digits[value[0]] || 0) * 10 + (digits[value[2]] || 0);
+    if (value.includes("百")) return (digits[value[0]] || 0) * 100 + (value[2] ? (digits[value[2]] || 0) * 10 : 0) + (value[3] ? digits[value[3]] || 0 : 0);
+    return value.split("").reduce((total, digit) => total * 10 + (digits[digit] ?? 0), 0);
+}
 
 export function parseListModeJson(text: string): ListGenerationResult | null {
     const candidates = [
@@ -103,6 +122,38 @@ function listCellText(value: unknown): string {
     return String(value);
 }
 
+function normalizedCellKey(value: string) {
+    return value.trim().toLocaleLowerCase().replace(/[\s\-_：:，,。.!！？?（）()【】\[\]]/g, "");
+}
+
+function rowCellValue(row: Record<string, string>, columnName: string, columnIndex: number) {
+    if (row[columnName]) return row[columnName];
+    const target = normalizedCellKey(columnName);
+    const matchedKey = Object.keys(row).find((key) => normalizedCellKey(key) === target || normalizedCellKey(key).includes(target) || target.includes(normalizedCellKey(key)));
+    if (matchedKey && row[matchedKey]) return row[matchedKey];
+    return Object.values(row)[columnIndex] || "";
+}
+
+function splitNumberedText(value: string) {
+    return value
+        .split(/\n+/)
+        .flatMap((line) => line.split(/(?=(?:^|\s)(?:\d{1,3}[.、)）]|[一二三四五六七八九十百]+[、.）)]))/))
+        .map((item) => item.trim().replace(/^(?:\d{1,3}[.、)）]|[一二三四五六七八九十百]+[、.）)])\s*/, ""))
+        .filter(Boolean);
+}
+
+function normalizeRequestedRows(parsed: ListGenerationResult, targetCount?: number) {
+    if (!targetCount || parsed.rows.length >= targetCount) return targetCount ? parsed.rows.slice(0, targetCount) : parsed.rows;
+    const firstColumn = parsed.columns[0];
+    const expanded = parsed.rows.flatMap((row) => {
+        const first = rowCellValue(row, firstColumn, 0);
+        const parts = splitNumberedText(first);
+        if (parts.length <= 1) return [row];
+        return parts.map((part) => ({ ...row, [firstColumn]: part }));
+    });
+    return expanded.slice(0, targetCount);
+}
+
 type HandleListGenerateOptions = {
     sourceNodeId: string;
     prompt: string;
@@ -145,6 +196,7 @@ export async function handleListGenerate({
     setRunningNodeId(sourceNodeId);
 
     try {
+        const targetRowCount = requestedListRowCount(prompt);
         // 列表模式必须沿用文本节点当前选中的模型。此前这里清空 node.metadata.model，
         // 会退回全局 textModel；当全局模型是普通文本模型时，界面虽显示 Gemini，
         // 实际请求却会发给不支持图片的旧模型。
@@ -170,7 +222,7 @@ export async function handleListGenerate({
             storageKey: node.metadata?.storageKey,
         }));
 
-        const fullPrompt = `${LIST_MODE_SYSTEM_PROMPT}\n\n用户任务：${prompt}\n\n图片数量：${imageNodes.length} 张`;
+        const fullPrompt = `${LIST_MODE_SYSTEM_PROMPT}\n\n用户任务：${prompt}\n\n图片数量：${imageNodes.length} 张\n目标行数：${targetRowCount || "未指定，按任务判断"}`;
 
         const result = await runBackendGenerationTask({
             projectId,
@@ -189,6 +241,11 @@ export async function handleListGenerate({
             return;
         }
 
+        const rowsForTable = normalizeRequestedRows(parsed, targetRowCount);
+        if (targetRowCount && rowsForTable.length !== targetRowCount) {
+            throw new Error(`模型只返回了 ${rowsForTable.length} 行，未满足你要求的 ${targetRowCount} 行，请重试`);
+        }
+
         // Build batch table data
         const textColumns = parsed.columns.map((name, i) => ({
             id: `ai-col-${i}`,
@@ -198,15 +255,15 @@ export async function handleListGenerate({
 
         const referenceColumn = { id: "ai-ref", label: "输入", type: "image" as const };
 
-        const rows: CanvasBatchRow[] = parsed.rows.map((row, rowIndex) => {
+        const rows: CanvasBatchRow[] = rowsForTable.map((row, rowIndex) => {
             const imageNode = imageNodes[rowIndex % imageNodes.length];
             const cells: Record<string, string> = {};
             parsed.columns.forEach((colName, colIndex) => {
-                cells[`ai-col-${colIndex}`] = row[colName] || "";
+                cells[`ai-col-${colIndex}`] = rowCellValue(row, colName, colIndex);
             });
             // Build prompt from all text cells
             const cellPrompts = parsed.columns.map((colName, colIndex) => {
-                const val = row[colName] || "";
+                const val = cells[`ai-col-${colIndex}`];
                 return val ? `${colName}：${val}` : "";
             }).filter(Boolean);
 
