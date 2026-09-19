@@ -85,7 +85,7 @@ describe("batch creation table", () => {
 
         expect(withoutText).not.toContain("repeat(0,");
         expect(withoutText).toContain("68px");
-        expect(withoutText).toContain("repeat(3, 88px)");
+        expect(withoutText).toContain("repeat(3, 72px)");
         expect(withText).toContain("repeat(1, minmax(168px, 0.75fr))");
     });
 

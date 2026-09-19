@@ -163,6 +163,7 @@ export function useCanvasBatchTable({ nodesRef, connectionsRef, setNodes, setCon
                 batchRowId: row.id,
                 batchOperation: table.operation,
                 batchInputNodeIds: row.inputNodeIds,
+                cameraControl: settings.cameraControl,
             };
             const output = existingIndex >= 0
                 ? { ...nextNodes[existingIndex], metadata }

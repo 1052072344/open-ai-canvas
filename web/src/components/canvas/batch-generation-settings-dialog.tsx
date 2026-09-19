@@ -6,10 +6,12 @@ import { ImageSettingsPanel } from "@/components/image-settings-panel";
 import { ModelPicker } from "@/components/model-picker";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { defaultImageParamsForModel } from "@/lib/model-selection";
+import { CanvasCameraControlPopover } from "./canvas-camera-control-popover";
+import type { CameraControlOptions } from "@/lib/canvas/camera-prompt-library";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import type { AiConfig } from "@/stores/use-config-store";
 
-export type BatchGenerationSettings = Pick<AiConfig, "model" | "imageModel" | "quality" | "size" | "transparentBackground" | "count">;
+export type BatchGenerationSettings = Pick<AiConfig, "model" | "imageModel" | "quality" | "size" | "transparentBackground" | "count"> & { cameraControl?: CameraControlOptions };
 
 type BatchGenerationSettingsDialogProps = {
     open: boolean;
@@ -23,9 +25,13 @@ type BatchGenerationSettingsDialogProps = {
 export function BatchGenerationSettingsDialog({ open, config, rowCount, concurrency, onClose, onConfirm }: BatchGenerationSettingsDialogProps) {
     const theme = canvasThemes[useActiveTheme()];
     const [generationConfig, setGenerationConfig] = useState<AiConfig>(config);
+    const [cameraControl, setCameraControl] = useState<CameraControlOptions | undefined>(undefined);
 
     useEffect(() => {
-        if (open) setGenerationConfig(config);
+        if (open) {
+            setGenerationConfig(config);
+            setCameraControl(undefined);
+        }
     }, [config, open]);
 
     const handleConfigChange = (key: "quality" | "size" | "transparentBackground" | "count", value: string) => {
@@ -78,6 +84,14 @@ export function BatchGenerationSettingsDialog({ open, config, rowCount, concurre
                     />
                 </div>
 
+                <div className="flex items-center justify-between border-t pt-3" style={{ borderColor: theme.node.stroke }}>
+                    <div>
+                        <div className="text-sm font-medium">摄像机控制</div>
+                        <div className="mt-1 text-xs opacity-60">为本批次统一应用镜头、焦段和光圈设置</div>
+                    </div>
+                    <CanvasCameraControlPopover cameraControl={cameraControl} onCameraControlChange={setCameraControl} theme={theme} compact />
+                </div>
+
                 <div className="mt-2 flex justify-end gap-2">
                     <Button icon={<X className="size-4" />} onClick={onClose}>取消</Button>
                     <Button
@@ -90,6 +104,7 @@ export function BatchGenerationSettingsDialog({ open, config, rowCount, concurre
                             size: generationConfig.size,
                             transparentBackground: generationConfig.transparentBackground,
                             count: generationConfig.count,
+                            cameraControl,
                         })}
                     >
                         开始生成 {rowCount} 个任务

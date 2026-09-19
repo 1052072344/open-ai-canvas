@@ -3,6 +3,7 @@ import { message } from "antd";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasBatchTableData, type CanvasBatchRow } from "@/types/canvas";
 import { runBackendGenerationTask } from "@/services/api/generation-task";
 import { buildGenerationConfig } from "@/lib/canvas/canvas-project-generation";
+import { modelRequestOptions, type ModelRequirements } from "@/lib/model-selection";
 import type { AiConfig } from "@/stores/use-config-store";
 
 const LIST_MODE_SYSTEM_PROMPT = `你是一个电商内容分析助手。用户会给你多张产品图片和一个任务描述。
@@ -29,28 +30,77 @@ type ListGenerationResult = {
     rows: Record<string, string>[];
 };
 
-function parseListModeJson(text: string): ListGenerationResult | null {
-    // Try to extract JSON from the response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    try {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (Array.isArray(parsed.columns) && Array.isArray(parsed.rows) && parsed.columns.length > 0) {
-            return parsed as ListGenerationResult;
-        }
-    } catch {
-        // Try removing markdown code blocks
-        const cleaned = jsonMatch[0].replace(/^```json\s*/, "").replace(/\s*```$/, "");
+export function parseListModeJson(text: string): ListGenerationResult | null {
+    const candidates = [
+        text.trim(),
+        ...Array.from(text.matchAll(/```(?:json)?\s*([\s\S]*?)\s*```/gi), (match) => match[1].trim()),
+        ...balancedJsonObjects(text),
+    ];
+    for (const candidate of candidates) {
         try {
-            const parsed = JSON.parse(cleaned);
-            if (Array.isArray(parsed.columns) && Array.isArray(parsed.rows)) {
-                return parsed as ListGenerationResult;
-            }
+            const parsed = JSON.parse(candidate) as { columns?: unknown; rows?: unknown };
+            const columns = normalizeListColumns(parsed.columns);
+            if (!columns.length || !Array.isArray(parsed.rows)) continue;
+            const rows = parsed.rows
+                .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row))
+                .map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, listCellText(value)])));
+            return { columns, rows };
         } catch {
-            return null;
+            // Try the next candidate. Models often wrap valid JSON in prose or a code block.
         }
     }
     return null;
+}
+
+function balancedJsonObjects(text: string) {
+    const results: string[] = [];
+    let start = -1;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+        if (inString) {
+            if (escaped) escaped = false;
+            else if (char === "\\") escaped = true;
+            else if (char === '"') inString = false;
+            continue;
+        }
+        if (char === '"') {
+            inString = true;
+            continue;
+        }
+        if (char === "{") {
+            if (depth === 0) start = index;
+            depth += 1;
+        } else if (char === "}" && depth > 0) {
+            depth -= 1;
+            if (depth === 0 && start >= 0) {
+                results.push(text.slice(start, index + 1));
+                start = -1;
+            }
+        }
+    }
+    return results;
+}
+
+function normalizeListColumns(value: unknown) {
+    if (!Array.isArray(value)) return [];
+    const used = new Set<string>();
+    return value.flatMap((item) => {
+        const label = typeof item === "string" ? item.trim() : "";
+        if (!label || used.has(label)) return [];
+        used.add(label);
+        return [label];
+    });
+}
+
+function listCellText(value: unknown): string {
+    if (typeof value === "string") return value.trim();
+    if (value === null || value === undefined) return "";
+    if (Array.isArray(value)) return value.map(listCellText).filter(Boolean).join("、");
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
 }
 
 type HandleListGenerateOptions = {
@@ -85,7 +135,7 @@ export async function handleListGenerate({
     const connectedImageIds = connections
         .filter((c) => c.toNodeId === sourceNodeId && c.fromNodeId !== sourceNodeId)
         .map((c) => c.fromNodeId);
-    const imageNodes = nodes.filter((n) => connectedImageIds.includes(n.id) && n.type === CanvasNodeType.Image && n.metadata?.content);
+    const imageNodes = nodes.filter((n) => connectedImageIds.includes(n.id) && n.type === CanvasNodeType.Image && Boolean(n.metadata?.content || n.metadata?.storageKey));
 
     if (imageNodes.length === 0) {
         message.warning("请先连接至少一张图片到当前文本节点");
@@ -95,13 +145,14 @@ export async function handleListGenerate({
     setRunningNodeId(sourceNodeId);
 
     try {
-        // Force text model: strip node.metadata.model so buildGenerationConfig uses config.textModel
+        // Ask model selection for a text model that can receive all connected images.
         const sourceNodeForConfig = { ...sourceNode, metadata: { ...(sourceNode.metadata || {}), model: undefined } };
-        let listConfig = buildGenerationConfig(config, sourceNodeForConfig, "text");
-        // Explicitly set model to the configured text model
-        if (config.textModel) {
-            listConfig = { ...listConfig, model: config.textModel };
-        }
+        const requirements: ModelRequirements = {
+            capability: "text",
+            input: { textCount: 1, imageCount: imageNodes.length, videoCount: 0, audioCount: 0, characterCount: 0 },
+            options: modelRequestOptions(config, "text"),
+        };
+        const listConfig = buildGenerationConfig(config, sourceNodeForConfig, "text", requirements);
 
         const referenceImages = imageNodes.map((node) => ({
             id: node.id,
