@@ -60,6 +60,7 @@ import { CanvasPanoramaConfigModal } from "@/components/canvas/canvas-panorama-c
 import { InfiniteCanvas } from "@/components/canvas/infinite-canvas";
 import { Minimap } from "@/components/canvas/canvas-mini-map";
 import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
+import { handleListGenerate } from "./list-mode-generator";
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
 import { useCanvasCreateCommands } from "@/components/canvas/use-canvas-create-commands";
 import { AssetPickerModal } from "@/components/canvas/asset-picker-modal";
@@ -2118,11 +2119,26 @@ function InfiniteCanvasPage() {
                         setNodeImageSettingsOpen(open);
                         if (open) setToolbarNodeId(null);
                     }}
+                    onListGenerate={(nodeId, listPrompt) => {
+                        void handleListGenerate({
+                            sourceNodeId: nodeId,
+                            prompt: listPrompt,
+                            nodes: nodesRef.current,
+                            connections: connectionsRef.current,
+                            config: effectiveConfig,
+                            projectId,
+                            setNodes,
+                            setConnections,
+                            setRunningNodeId,
+                            setDialogNodeId,
+                        });
+                    }}
                 />
             );
         },
         [
             configInputsById,
+            effectiveConfig,
             handleConfigNodeChange,
             handleGenerateNode,
             handleNodePromptChange,
@@ -2134,6 +2150,10 @@ function InfiniteCanvasPage() {
             message,
             projectId,
             runningNodeId,
+            setConnections,
+            setDialogNodeId,
+            setNodes,
+            setRunningNodeId,
             skillMentionReferences,
             workspaceMode,
         ],
