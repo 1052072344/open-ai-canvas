@@ -962,11 +962,6 @@ export function useCanvasMediaTools({
         }
     }, [bindGenerationTask, effectiveConfig, finishGenerationRequest, isAiConfigReady, message, nodesRef, persistMediaNodes, projectId, setConnections, setDialogNodeId, setNodes, setRunningNodeId, setSelectedConnectionId, setSelectedNodeIds, startGenerationRequest]);
 
-    const openImageEditNode = useCallback((node: CanvasNodeData) => {
-        setImageEditPreset(null);
-        setImageEditNodeId(node.id);
-    }, []);
-
     const openBackgroundRemoval = useCallback((node: CanvasNodeData) => {
         setImageEditPreset("remove-background");
         setImageEditNodeId(node.id);
@@ -1247,7 +1242,6 @@ export function useCanvasMediaTools({
         setMaskEditNodeId,
         setImageEditNodeId,
         setImageEditPreset,
-        openImageEditNode,
         openBackgroundRemoval,
         openLayerDecomposition,
         decomposeImageLayers,

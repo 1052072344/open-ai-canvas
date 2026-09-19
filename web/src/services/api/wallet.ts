@@ -52,9 +52,10 @@ export type ChannelModel = {
     modelKey: string;
     providerModelKey: string;
     displayName: string;
+    channelLabel?: string;
+    description?: string;
     sortOrder?: number;
     icon: string;
-    description?: string;
     capability: "text" | "image" | "video" | "audio" | "";
     protocol?: import("@/lib/model-protocols").ModelProtocol;
     billingMode: "fixed_request" | "per_second" | "token";
@@ -73,6 +74,8 @@ export type ChannelModel = {
 };
 
 export type ChannelModelPriceTier = {
+    /** 仅管理员模型编辑接口返回，不能复制到用户模型目录。 */
+    costPricing?: CreditCostPricing;
     id: string;
     channelModelId: string;
     selector: Record<string, string>;
@@ -92,13 +95,22 @@ export type ChannelModelPriceTier = {
     updatedAt: string;
 };
 
+export type CreditCostPricing = {
+    configured: boolean;
+    unitPriceMicrocredits: number;
+    inputTokenPriceMicrocredits: number;
+    outputTokenPriceMicrocredits: number;
+    cachedTokenPriceMicrocredits: number;
+};
+
 // 系统渠道模型的写入合同。标量价格只用于兼容旧管理请求；新的后台界面只提交 priceTiers。
 export type ChannelModelMutation = {
     modelKey: string;
     providerModelKey?: string;
     displayName?: string;
-    icon?: string;
+    channelLabel?: string;
     description?: string;
+    icon?: string;
     capability: ChannelModel["capability"];
     protocol?: ChannelModel["protocol"];
     enabled?: boolean;
@@ -216,6 +228,8 @@ export type BillingOrder = {
     outputTokens: number;
     cachedTokens: number;
     usageAvailable: boolean;
+    videoFormulaTokens?: number;
+    usageSource?: "provider" | "video_formula";
     status: "reserved" | "running" | "settled" | "refunded" | "uncertain";
     providerRequestId?: string;
     error?: string;
