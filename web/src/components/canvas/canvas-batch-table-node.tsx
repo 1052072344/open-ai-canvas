@@ -48,6 +48,7 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
     const batchItemByRowId = useMemo(() => new Map((batch?.items || []).map((item) => [item.rowId, item])), [batch?.items]);
     const connectedImageCount = useMemo(() => new Set(connections.filter((connection) => connection.toNodeId === node.id).map((connection) => connection.fromNodeId)).size, [connections, node.id]);
     const completed = table.rows.filter((row) => Boolean(row.outputNodeId && nodeById.get(row.outputNodeId)?.metadata?.content)).length;
+    const isAiTable = Boolean(table.aiGenerated);
     const gridTemplateColumns = batchGridTemplateColumns(referenceColumns.length, textColumns.length);
     const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null);
     const [draggingCell, setDraggingCell] = useState<ReferenceCell | null>(null);
@@ -254,7 +255,7 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto rounded-b-[inherit]" onMouseDown={(event) => event.stopPropagation()}>
-                <div className="sticky top-0 z-10 grid min-w-[820px] items-center gap-2 border-b px-3 py-2 font-medium" style={{ borderColor: theme.node.stroke, gridTemplateColumns, background: theme.node.panel, color: theme.node.muted }}>
+                <div className="sticky top-0 z-10 grid min-w-[900px] items-center gap-2 border-b px-3 py-2 font-medium" style={{ borderColor: theme.node.stroke, gridTemplateColumns, background: theme.node.panel, color: theme.node.muted }}>
                     <span>#</span>
                     <span>任务</span>
                     {referenceColumns.map((column) => (
@@ -273,7 +274,7 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
                         const item = batchItemByRowId.get(row.id);
                         const status = rowStatus(item, output);
                         return (
-                            <div key={row.id} className="grid min-w-[820px] items-center gap-2 border-b px-3 py-3" style={{ borderColor: theme.node.stroke, gridTemplateColumns }}>
+                            <div key={row.id} className="grid min-w-[900px] items-center gap-2 border-b px-3 py-3" style={{ borderColor: theme.node.stroke, gridTemplateColumns }}>
                                 <span className="tabular-nums opacity-45">{index + 1}</span>
                                 <div className="flex items-center gap-1.5">
                                     <Switch size="small" checked={row.enabled !== false} disabled={readOnly} onChange={(enabled) => onUpdateRow(row.id, { enabled })} aria-label={`任务 ${index + 1}`} />
@@ -302,8 +303,14 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
                                     />
                                 ))}
                                 {textColumns.map((column, columnIndex) => (
-                                    <div key={column.id} className={columnIndex === 0 ? "border-l pl-3" : undefined} style={columnIndex === 0 ? { borderColor: theme.node.stroke } : undefined}>
-                                        <TextNodeCell node={row.textNodeIds?.[columnIndex] ? nodeById.get(row.textNodeIds[columnIndex]) : undefined} theme={theme} />
+                                    <div key={column.id} className={`${columnIndex === 0 ? "border-l pl-3" : ""} min-w-0`} style={columnIndex === 0 ? { borderColor: theme.node.stroke } : undefined}>
+                                        {table.aiGenerated ? (
+                                            <div className="line-clamp-4 text-[11px] leading-relaxed" style={{ color: theme.node.text }}>
+                                                {row.cells?.[column.id] || ""}
+                                            </div>
+                                        ) : (
+                                            <TextNodeCell node={row.textNodeIds?.[columnIndex] ? nodeById.get(row.textNodeIds[columnIndex]) : undefined} theme={theme} />
+                                        )}
                                     </div>
                                 ))}
                                 <Input.TextArea value={batchPromptForRow(table, row)} readOnly={readOnly || hasGlobalPrompt} autoSize={{ minRows: 2, maxRows: 4 }} placeholder={hasGlobalPrompt ? "已由全局提示词覆盖" : "描述这一行要生成的画面"} onChange={(event) => onUpdateRow(row.id, { prompt: event.target.value })} />

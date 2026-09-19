@@ -131,6 +131,7 @@ import { useCanvasStyleWorkflow } from "./use-canvas-style-workflow";
 import { useCanvasDirector } from "./use-canvas-director";
 import { useCanvasGeneration } from "./use-canvas-generation";
 import { useCanvasGenerationBatches } from "./use-canvas-generation-batches";
+import { handleListGenerate } from "./list-mode-generator";
 import { useCanvasBatchTable } from "./use-canvas-batch-table";
 import { useCanvasGenerationExecutor, type CanvasNodeGenerationOptions } from "./use-canvas-generation-executor";
 import { useCanvasGenerationRetry } from "./use-canvas-generation-retry";
@@ -2105,6 +2106,20 @@ function InfiniteCanvasPage() {
                     onImageSettingsOpenChange={(open) => {
                         setNodeImageSettingsOpen(open);
                         if (open) setToolbarNodeId(null);
+                    }}
+                    onListGenerate={(nodeId, listPrompt) => {
+                        void handleListGenerate({
+                            sourceNodeId: nodeId,
+                            prompt: listPrompt,
+                            nodes: nodesRef.current,
+                            connections: connectionsRef.current,
+                            config: effectiveConfig,
+                            projectId,
+                            setNodes,
+                            setConnections,
+                            setRunningNodeId,
+                            setDialogNodeId,
+                        });
                     }}
                 />
             );

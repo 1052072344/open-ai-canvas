@@ -172,10 +172,14 @@ export type CanvasBatchRow = {
     textNodeIds?: string[];
     prompt: string;
     outputNodeId?: string;
+    /** AI-generated cell content keyed by column id (for aiGenerated tables). */
+    cells?: Record<string, string>;
 };
+export type CanvasBatchColumnType = "image" | "text";
 export type CanvasBatchReferenceColumn = {
     id: string;
     label: string;
+    type?: CanvasBatchColumnType;
 };
 export type CanvasBatchTableData = {
     operation: CanvasBatchOperation;
@@ -185,6 +189,8 @@ export type CanvasBatchTableData = {
     referenceColumns?: CanvasBatchReferenceColumn[];
     textColumns?: CanvasBatchReferenceColumn[];
     rows: CanvasBatchRow[];
+    /** When true, columns are AI-generated with dynamic headers. */
+    aiGenerated?: boolean;
 };
 
 export type CanvasSkillSnapshot = {
@@ -224,6 +230,8 @@ export type CanvasNodeMetadata = {
           };
     content?: string;
     previewContent?: string;
+    /** When true, text prompt panel uses list/table generation mode. */
+    listMode?: boolean;
     videoPreview?: {
         content: string;
         storageKey?: string;
@@ -488,7 +496,7 @@ export type CanvasConnection = {
     toHandleId?: string;
     fromAnchorRatio?: number;
     toAnchorRatio?: number;
-    relation?: "storyboard-output" | "storyboard-asset-reference" | "batch-output";
+    relation?: "storyboard-output" | "storyboard-asset-reference" | "batch-output" | "batch-input";
     storyboardRowId?: string;
 };
 
