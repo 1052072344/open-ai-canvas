@@ -95,7 +95,13 @@ export async function handleListGenerate({
     setRunningNodeId(sourceNodeId);
 
     try {
-        const listConfig = buildGenerationConfig(config, sourceNode, "text");
+        // Force text model: strip node.metadata.model so buildGenerationConfig uses config.textModel
+        const sourceNodeForConfig = { ...sourceNode, metadata: { ...(sourceNode.metadata || {}), model: undefined } };
+        let listConfig = buildGenerationConfig(config, sourceNodeForConfig, "text");
+        // Explicitly set model to the configured text model
+        if (config.textModel) {
+            listConfig = { ...listConfig, model: config.textModel };
+        }
 
         const referenceImages = imageNodes.map((node) => ({
             id: node.id,
