@@ -69,6 +69,7 @@ import { CanvasZoomControls } from "@/components/canvas/canvas-zoom-controls";
 import { CanvasShareModal } from "@/components/canvas/canvas-share-modal";
 import { CanvasScriptEditor, CanvasScriptNodeContent } from "@/components/canvas/canvas-script-node";
 import { CanvasBatchTableNodeContent } from "@/components/canvas/canvas-batch-table-node";
+import { BatchGenerationSettingsDialog } from "@/components/canvas/batch-generation-settings-dialog";
 import { batchReferenceColumns, promoteLegacyBatchTableSize } from "@/lib/canvas/canvas-batch-table";
 import { STORYBOARD_HEADER_HEIGHT, STORYBOARD_ROW_HEIGHT, storyboardMinNodeHeight, storyboardTableHeight } from "@/lib/canvas/canvas-storyboard-layout";
 import { CanvasDirectorNodePanel } from "@/components/canvas/director/canvas-director-node-panel";
@@ -1910,7 +1911,25 @@ function InfiniteCanvasPage() {
         handleGenerateNode,
     });
 
-    const { addReferenceColumn: addBatchReferenceColumn, addRow: addBatchRow, fillRowsFromConnections, generateRows: generateBatchRows, moveReferenceCell: moveBatchReferenceCell, patchTable: patchBatchTable, removeReferenceColumn: removeBatchReferenceColumn, removeRow: removeBatchRow, reorderReferenceColumns: reorderBatchReferenceColumns, syncRowsFromConnections, updateRow: updateBatchRow } = useCanvasBatchTable({
+    const {
+        addReferenceColumn: addBatchReferenceColumn,
+        addRow: addBatchRow,
+        batchGenDialogConfig,
+        batchGenDialogConcurrency,
+        batchGenDialogOpen,
+        batchGenDialogRowCount,
+        closeBatchGenDialog,
+        confirmBatchGenDialog,
+        fillRowsFromConnections,
+        generateRows: generateBatchRows,
+        moveReferenceCell: moveBatchReferenceCell,
+        patchTable: patchBatchTable,
+        removeReferenceColumn: removeBatchReferenceColumn,
+        removeRow: removeBatchRow,
+        reorderReferenceColumns: reorderBatchReferenceColumns,
+        syncRowsFromConnections,
+        updateRow: updateBatchRow,
+    } = useCanvasBatchTable({
         nodesRef,
         connectionsRef,
         setNodes,
@@ -3223,6 +3242,15 @@ function InfiniteCanvasPage() {
                             clearConfirmOpen={clearConfirmOpen}
                             onCancelClear={() => setClearConfirmOpen(false)}
                             onConfirmClear={clearCanvas}
+                        />
+
+                        <BatchGenerationSettingsDialog
+                            open={batchGenDialogOpen}
+                            config={batchGenDialogConfig}
+                            rowCount={batchGenDialogRowCount}
+                            concurrency={batchGenDialogConcurrency}
+                            onClose={closeBatchGenDialog}
+                            onConfirm={confirmBatchGenDialog}
                         />
 
                         <AssetPickerModal open={assetPickerOpen} multiple={assetInsertScope === "canvas"} onInsert={handleLibraryAssetsInsert} onClose={closeAssetPicker} />
