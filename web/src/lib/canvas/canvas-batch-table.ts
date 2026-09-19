@@ -15,7 +15,7 @@ export function batchGridTemplateColumns(referenceCount: number, textCount: numb
     return [
         "36px",
         "68px",
-        `repeat(\${referenceCount}, 72px)`,
+        `repeat(${referenceCount}, 72px)`,
         textCount > 0 ? `repeat(${textCount}, minmax(168px, 0.75fr))` : undefined,
         "minmax(280px, 1fr)",
         "148px",
