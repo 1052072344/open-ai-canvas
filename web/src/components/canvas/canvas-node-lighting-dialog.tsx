@@ -301,7 +301,7 @@ export function CanvasNodeLightingPanel({ dataUrl, onClose, onConfirm }: { dataU
                     style={{ borderColor: theme.toolbar.border, background: theme.toolbar.itemHover, color: theme.node.text, opacity: options.smartMode ? 1 : 0.55 }}
                 />
                 <span className="text-[var(--fs-tiny)] font-medium" style={{ color: theme.node.muted }}>预设</span>
-                <div className="grid shrink-0 auto-rows-[60px] grid-cols-2 gap-1.5">
+                <div className="grid shrink-0 auto-rows-[60px] grid-cols-4 gap-1.5">
                     {STYLE_PRESETS.map((preset) => (
                         <button
                             key={preset.id}
