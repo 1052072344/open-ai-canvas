@@ -2174,6 +2174,15 @@ function InfiniteCanvasPage() {
                         onMoveReferenceCell={(sourceRowId, sourceColumnIndex, targetRowId, targetColumnIndex) => moveBatchReferenceCell(contentNode.id, sourceRowId, sourceColumnIndex, targetRowId, targetColumnIndex)}
                         onReplaceReference={replaceCanvasNodeMedia}
                         onUploadReference={(rowId, columnIndex, file) => { void handleUploadBatchReference(contentNode.id, rowId, columnIndex, file); }}
+                        onRemoveReference={(rowId, columnIndex) => {
+                            const table = nodesRef.current.find((n) => n.id === contentNode.id)?.metadata?.batchTable;
+                            if (!table) return;
+                            const row = table.rows.find((r) => r.id === rowId);
+                            if (!row) return;
+                            const newInputNodeIds = [...row.inputNodeIds];
+                            newInputNodeIds[columnIndex] = "";
+                            updateBatchRow(contentNode.id, rowId, { inputNodeIds: newInputNodeIds });
+                        }}
                         onConnectStart={(event, handleId) => handleConnectStart(event, contentNode.id, "target", handleId)}
                         onConnectDrop={(event, handleId) => handleConnectDrop(event, contentNode.id, handleId)}
                     />

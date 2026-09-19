@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Button, Input, Select, Switch, Tooltip } from "antd";
 import { GripVertical, Image as ImageIcon, LoaderCircle, Play, Plus, RefreshCw, Rows3, Trash2, Upload } from "lucide-react";
 
@@ -26,6 +26,7 @@ type Props = {
     onMoveReferenceCell: (sourceRowId: string, sourceColumnIndex: number, targetRowId: string, targetColumnIndex: number) => void;
     onReplaceReference: (node: CanvasNodeData) => void;
     onUploadReference: (rowId: string, columnIndex: number, file: File) => void;
+    onRemoveReference: (rowId: string, columnIndex: number) => void;
     onConnectStart: (event: ReactPointerEvent, handleId: string) => void;
     onConnectDrop?: (event: ReactPointerEvent, handleId: string) => void;
     readOnly?: boolean;
@@ -38,7 +39,7 @@ const OPERATION_OPTIONS = [
 
 type ReferenceCell = { rowId: string; columnIndex: number };
 
-export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, theme, onPatchTable, onAddRow, onRemoveRow, onUpdateRow, onFillRows, onGenerate, onRetryItem, onAddReferenceColumn, onAddTextColumn, onReorderReferenceColumns, onMoveReferenceCell, onReplaceReference, onUploadReference, onConnectStart, onConnectDrop, readOnly = false }: Props) {
+export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, theme, onPatchTable, onAddRow, onRemoveRow, onUpdateRow, onFillRows, onGenerate, onRetryItem, onAddReferenceColumn, onAddTextColumn, onReorderReferenceColumns, onMoveReferenceCell, onReplaceReference, onUploadReference, onRemoveReference, onConnectStart, onConnectDrop, readOnly = false }: Props) {
     const table = node.metadata?.batchTable || { operation: "try_on" as const, concurrency: 10, rows: [] };
     const referenceColumns = batchReferenceColumns(table);
     const textColumns = batchTextColumns(table);
@@ -57,6 +58,8 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
     const dropCellRef = useRef<ReferenceCell | null>(null);
     const dragStartRef = useRef<{ x: number; y: number; pointerId: number; cell: ReferenceCell } | null>(null);
     const lastPointerRef = useRef({ x: 0, y: 0 });
+    const hoveredCellRef = useRef<ReferenceCell | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; cell: ReferenceCell } | null>(null);
     const suppressClickRef = useRef(false);
     const uploadTargetRef = useRef<{ rowId: string; columnIndex: number } | null>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +151,30 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
             window.removeEventListener("blur", handleWindowBlur);
         };
     }, [cancelReferenceDrag, finishReferenceDrag, updateReferenceDrag]);
+
+    // Delete / Backspace to remove hovered reference
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== "Delete" && event.key !== "Backspace") return;
+            const target = event.target as HTMLElement;
+            if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+            const cell = hoveredCellRef.current;
+            if (!cell || readOnly) return;
+            event.preventDefault();
+            event.stopPropagation();
+            onRemoveReference(cell.rowId, cell.columnIndex);
+        };
+        window.addEventListener("keydown", handleKeyDown, true);
+        return () => window.removeEventListener("keydown", handleKeyDown, true);
+    }, [readOnly, onRemoveReference]);
+
+    // Hide context menu on outside click
+    useEffect(() => {
+        if (!contextMenu) return;
+        const hide = () => setContextMenu(null);
+        window.addEventListener("pointerdown", hide);
+        return () => window.removeEventListener("pointerdown", hide);
+    }, [contextMenu]);
 
     const handleReferencePointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>, rowId: string, columnIndex: number, hasMaterial: boolean) => {
         if (readOnly || !hasMaterial) return;
@@ -293,7 +320,10 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
                                         isDraggingCell={draggingCell?.rowId === row.id && draggingCell.columnIndex === columnIndex}
                                         isDropTarget={dropCell?.rowId === row.id && dropCell.columnIndex === columnIndex}
                                         suppressClickRef={suppressClickRef}
+                                        hoveredCellRef={hoveredCellRef}
                                         onReplace={onReplaceReference}
+                                        onRemove={() => onRemoveReference(row.id, columnIndex)}
+                                        onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, cell: { rowId: row.id, columnIndex } }); }}
                                         onUpload={() => { uploadTargetRef.current = { rowId: row.id, columnIndex }; uploadInputRef.current?.click(); }}
                                         onPointerDown={handleReferencePointerDown}
                                         onPointerMove={handleReferencePointerMove}
@@ -351,6 +381,23 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
                     <div className="grid h-40 place-items-center px-5 text-center" style={{ color: theme.node.muted }}>连接图片后会自动生成任务；点击缩略图可替换素材，拖动参考图列可调整顺序。</div>
                 )}
             </div>
+            {contextMenu ? (
+                <div
+                    className="fixed z-50 min-w-[120px] rounded-lg border py-1 shadow-lg"
+                    style={{ left: contextMenu.x, top: contextMenu.y, background: theme.node.panel, borderColor: theme.node.stroke }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                >
+                    <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:opacity-70"
+                        style={{ color: "#ef4444" }}
+                        onClick={() => { onRemoveReference(contextMenu.cell.rowId, contextMenu.cell.columnIndex); setContextMenu(null); }}
+                    >
+                        <Trash2 className="size-3.5" />
+                        删除素材
+                    </button>
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -497,7 +544,7 @@ function TextNodeCell({ node, theme }: { node?: CanvasNodeData; theme: CanvasThe
     return <div className="min-h-12 max-w-full overflow-hidden rounded border px-2 py-1.5 text-[11px] leading-4" style={{ borderColor: theme.node.stroke, color: content ? theme.node.text : theme.node.placeholder }} title={content || "未连接文字节点"}>{content || "未连接文字"}</div>;
 }
 
-function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnId, draggingColumnId, isDraggingCell, isDropTarget, suppressClickRef, onReplace, onUpload, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onLostPointerCapture }: {
+function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnId, draggingColumnId, isDraggingCell, isDropTarget, suppressClickRef, hoveredCellRef, onReplace, onRemove, onContextMenu, onUpload, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onLostPointerCapture }: {
     node?: CanvasNodeData;
     theme: CanvasTheme;
     readOnly: boolean;
@@ -508,7 +555,10 @@ function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnI
     isDraggingCell: boolean;
     isDropTarget: boolean;
     suppressClickRef: MutableRefObject<boolean>;
+    hoveredCellRef: MutableRefObject<ReferenceCell | null>;
     onReplace: (node: CanvasNodeData) => void;
+    onRemove: () => void;
+    onContextMenu: (event: ReactMouseEvent) => void;
     onUpload: () => void;
     onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>, rowId: string, columnIndex: number, hasMaterial: boolean) => void;
     onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -528,6 +578,9 @@ function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnI
                     style={{ borderColor: isDropTarget ? theme.accent.primary : theme.node.stroke, background: `${theme.node.panel}88`, ...dropStyle }}
                     disabled={readOnly}
                     onClick={(event) => { event.stopPropagation(); if (!suppressClickRef.current) onUpload(); }}
+                    onMouseEnter={() => { hoveredCellRef.current = { rowId, columnIndex }; }}
+                    onMouseLeave={() => { if (hoveredCellRef.current?.rowId === rowId && hoveredCellRef.current?.columnIndex === columnIndex) hoveredCellRef.current = null; }}
+                    onContextMenu={onContextMenu}
                     aria-label={`${columnId}，点击上传图片`}
                     {...cellData}
                     onPointerDown={(event) => onPointerDown(event, rowId, columnIndex, false)}
@@ -553,6 +606,9 @@ function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnI
                 style={{ borderColor: isDropTarget || draggingColumnId === columnId ? theme.accent.primary : theme.node.stroke, opacity: isDraggingCell || draggingColumnId === columnId ? 0.55 : 1, ...dropStyle }}
                 aria-label={readOnly ? node.title || "参考图" : `${node.title || "参考图"}，点击替换素材`}
                 onClick={(event) => { event.stopPropagation(); if (!readOnly && !draggingColumnId && !suppressClickRef.current) onReplace(node); }}
+                onMouseEnter={() => { hoveredCellRef.current = { rowId, columnIndex }; }}
+                onMouseLeave={() => { if (hoveredCellRef.current?.rowId === rowId && hoveredCellRef.current?.columnIndex === columnIndex) hoveredCellRef.current = null; }}
+                onContextMenu={onContextMenu}
                 {...cellData}
                 onPointerDown={(event) => onPointerDown(event, rowId, columnIndex, true)}
                 onPointerMove={onPointerMove}
