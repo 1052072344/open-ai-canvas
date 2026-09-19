@@ -274,7 +274,9 @@ func MatchCapability(spec CapabilitySpec, intent ModelRequestIntent) CapabilityM
 		}
 		constraint, declared := spec.Inputs[inputType]
 		if !declared {
-			if count > 0 {
+			// Multimodal text models may accept reference images even when the
+			// provider catalog does not explicitly declare the image input.
+			if count > 0 && !(normalizeCapability(spec.Capability) == "text" && inputType == "image") {
 				reasons = append(reasons, "不支持 "+capabilityInputLabel(inputType)+"输入")
 			}
 			continue
