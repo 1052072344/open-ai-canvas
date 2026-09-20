@@ -78,30 +78,7 @@ jobs:
       - name: Check formatting
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          changed_files=()
-          repo_prefix="$(git rev-parse --show-prefix)"
-          while IFS= read -r -d '' file; do
-            case "$file" in
-              *.css|*.html|*.json|*.js|*.jsx|*.md|*.mdx|*.mjs|*.cjs|*.ts|*.tsx|*.yaml|*.yml)
-                base_path="${repo_prefix}${file}"
-                if git cat-file -e "$BASE_SHA:$base_path" 2>/dev/null \
-                  && ! diff -q \
-                    <(git show "$BASE_SHA:$base_path") \
-                    <(git show "$BASE_SHA:$base_path" | bunx prettier --ignore-path /dev/null --stdin-filepath "$file") \
-                    >/dev/null; then
-                  echo "Skipping legacy unformatted file: $file"
-                  continue
-                fi
-                changed_files+=("$file")
-                ;;
-            esac
-          done < <(git diff --relative --name-only --diff-filter=ACMR -z "$BASE_SHA" "$GITHUB_SHA" -- .)
-          if (( ${#changed_files[@]} > 0 )); then
-            bunx prettier --check "${changed_files[@]}"
-          else
-            echo "No changed web files require formatting checks."
-          fi
+        run: bun scripts/check-changed-formatting.mjs
       - name: Typecheck
         run: bun run typecheck
       - name: Lint retired Ant Design APIs
