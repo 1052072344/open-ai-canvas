@@ -6,6 +6,7 @@ import type { StyleExecutionPlan } from "@/lib/canvas/style-profile";
 import type { ArtCritiqueNodeState } from "@/lib/art-critique/contracts";
 import type { CameraControlOptions } from "@/lib/canvas/camera-prompt-library";
 import type { SrtEntry, SubtitleHighlight, SubtitleStyle } from "@/types/timeline";
+import type { GenerationSpec } from "@/lib/canvas/generation-contract.generated";
 
 export type Position = {
     x: number;
@@ -121,10 +122,6 @@ export type StoryboardRow = {
     timeBeats: string;
     imageGenerationPrompt: string;
     videoMotionPrompt: string;
-    /** 原视频拆解时的时间范围，用于自动抽取关键帧。 */
-    sourceStartMs?: number;
-    sourceEndMs?: number;
-    keyframeTimeMs?: number;
     imagePromptTemplateVariables?: Record<string, string>;
     videoPromptTemplateVariables?: Record<string, string>;
     mustHave: string[];
@@ -132,6 +129,10 @@ export type StoryboardRow = {
     continuityOut: string;
     negativePrompt: string;
     assetBindings: StoryboardAssetBinding[];
+    /** 原视频拆解时的时间范围，用于自动抽取关键帧。 */
+    sourceStartMs?: number;
+    sourceEndMs?: number;
+    keyframeTimeMs?: number;
     imageNodeId?: string;
     videoNodeId?: string;
     status?: CanvasNodeStatus;
@@ -216,6 +217,8 @@ export type CanvasSkillSnapshot = {
 };
 
 export type CanvasNodeMetadata = {
+    /** Credential-free editable generation contract; submitted recipes live with tasks. */
+    generationSpec?: GenerationSpec;
     /** Namespaced extension ownership for nodes contributed by a unified plugin. */
     pluginId?: string;
     pluginNodeId?: string;
@@ -240,8 +243,6 @@ export type CanvasNodeMetadata = {
           };
     content?: string;
     previewContent?: string;
-    /** When true, text prompt panel uses list/table generation mode. */
-    listMode?: boolean;
     videoPreview?: {
         content: string;
         storageKey?: string;

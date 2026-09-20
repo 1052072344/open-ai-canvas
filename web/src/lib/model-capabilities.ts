@@ -13,6 +13,10 @@ export type TextCapabilityConfig = {
     streaming?: boolean;
     /** Whether the model exposes a user-selectable reasoning/thinking mode. */
     thinking?: boolean;
+    /** Total provider input plus output context window, in tokens. */
+    contextWindowTokens: number;
+    /** Provider completion/reasoning output ceiling, in tokens. */
+    maxOutputTokens: number;
     references: {
         promptMaxChars: number;
         maxImages: number;
@@ -109,8 +113,7 @@ const DEFAULT_TEXT_REFERENCE_MAX_IMAGES = 16;
 const DEFAULT_TEXT_REFERENCE_MAX_VIDEOS = 3;
 
 function isKnownMultimodalTextModel(protocol?: ModelProtocol, model = "") {
-    // These model families currently expose vision through their text/chat
-    // endpoint, including when they are wrapped by an OpenAI-compatible gateway.
+    // Gemini、GPT 和豆包的文本/聊天接口均可承载视觉输入；兼容网关通常只改变协议名。
     return /gemini|gpt|doubao|豆包/i.test(model) || protocol === "gemini";
 }
 
@@ -126,7 +129,14 @@ function normalizeCapabilityStrings(values: string[]) {
 export function normalizeModelCapabilityConfig(config: ModelCapabilityConfig): ModelCapabilityConfig {
     return {
         ...config,
-        text: config.text ? { ...config.text, streaming: config.text.streaming !== false } : config.text,
+        text: config.text
+            ? {
+                  ...config.text,
+                  streaming: config.text.streaming !== false,
+                  contextWindowTokens: config.text.contextWindowTokens || 128_000,
+                  maxOutputTokens: config.text.maxOutputTokens || 16_384,
+              }
+            : config.text,
         image: config.image
             ? {
                   ...config.image,
@@ -295,6 +305,8 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
 export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = ""): ModelCapabilityConfig {
     const text: TextCapabilityConfig = {
         streaming: true,
+        contextWindowTokens: 128_000,
+        maxOutputTokens: 16_384,
         references: {
             promptMaxChars: 32000,
             maxImages: isKnownMultimodalTextModel(protocol, model) ? DEFAULT_TEXT_REFERENCE_MAX_IMAGES : 0,
@@ -414,7 +426,16 @@ export function modelCapabilityConfigFor(config: { channels: Array<{ id: string;
     const capabilityConfig = normalizeModelCapabilityConfig(cost.capabilityConfig);
     const mergedText = capabilityConfig.text ? { ...fallback.text!, ...capabilityConfig.text, references: { ...fallback.text!.references, ...capabilityConfig.text.references } } : fallback.text;
     const text = mergedText && isKnownMultimodalTextModel(cost?.protocol, modelName) && (mergedText.references.maxImages === 0 || mergedText.references.maxVideos === 0)
-        ? { ...mergedText, references: { ...mergedText.references, maxImages: mergedText.references.maxImages || DEFAULT_TEXT_REFERENCE_MAX_IMAGES, maxImageBytes: mergedText.references.maxImageBytes || 30 * 1024 * 1024, maxVideos: mergedText.references.maxVideos || DEFAULT_TEXT_REFERENCE_MAX_VIDEOS, maxVideoBytes: mergedText.references.maxVideoBytes || 200 * 1024 * 1024 } }
+        ? {
+              ...mergedText,
+              references: {
+                  ...mergedText.references,
+                  maxImages: mergedText.references.maxImages || DEFAULT_TEXT_REFERENCE_MAX_IMAGES,
+                  maxImageBytes: mergedText.references.maxImageBytes || 30 * 1024 * 1024,
+                  maxVideos: mergedText.references.maxVideos || DEFAULT_TEXT_REFERENCE_MAX_VIDEOS,
+                  maxVideoBytes: mergedText.references.maxVideoBytes || 200 * 1024 * 1024,
+              },
+          }
         : mergedText;
     const video = capabilityConfig.video ? { ...fallback.video!, ...capabilityConfig.video, references: { ...fallback.video!.references, ...capabilityConfig.video.references } } : fallback.video;
     const configuredImage = capabilityConfig.image;
