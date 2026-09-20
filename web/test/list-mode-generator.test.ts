@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseListModeJson, requestedListRowCount } from "@/pages/canvas/list-mode-generator";
+import { parseListModeJson, parseStoryboardJson, requestedListRowCount } from "@/pages/canvas/list-mode-generator";
 
 test("extracts the requested row count from natural language", () => {
     expect(requestedListRowCount("帮我生成5个卖点")).toBe(5);
@@ -33,5 +33,11 @@ describe("list mode response parsing", () => {
     test("rejects malformed responses", () => {
         expect(parseListModeJson("模型暂时无法分析")).toBeNull();
         expect(parseListModeJson('{"columns":[],"rows":[]}')).toBeNull();
+    });
+
+    test("parses a storyboard response and derives generation prompts", () => {
+        const result = parseStoryboardJson('```json\n{"title":"拆解","rows":[{"durationSeconds":3,"plotDescription":"产品推近","motion":"缓慢推进","keyframeTimeSeconds":1.5}]}\n```');
+        expect(result?.title).toBe("拆解");
+        expect(result?.rows[0]).toMatchObject({ durationSeconds: 3, plotDescription: "产品推近", motion: "缓慢推进", videoMotionPrompt: "产品推近；缓慢推进", keyframeTimeMs: 1500 });
     });
 });

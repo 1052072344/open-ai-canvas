@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Button, Input, Select, Switch, Tooltip } from "antd";
-import { GripVertical, Image as ImageIcon, LoaderCircle, Play, Plus, RefreshCw, Rows3, Trash2, Upload, X } from "lucide-react";
+import { Film, GripVertical, Image as ImageIcon, LoaderCircle, Play, Plus, RefreshCw, Rows3, Trash2, Upload, X } from "lucide-react";
 
 import { CachedResourceImage } from "@/components/cached-resource-image";
 import { BATCH_REFERENCE_HANDLE_GAP, BATCH_REFERENCE_HANDLE_TOP, MAX_BATCH_REFERENCE_COLUMNS, MAX_BATCH_TEXT_COLUMNS, batchGridTemplateColumns, batchPromptForRow, batchReferenceColumns, batchReferenceHandleId, batchTextColumns, batchTextHandleId, batchTextHandleTop } from "@/lib/canvas/canvas-batch-table";
@@ -19,6 +19,7 @@ type Props = {
     onUpdateRow: (rowId: string, patch: Partial<CanvasBatchRow>) => void;
     onFillRows: () => void;
     onGenerate: (rowIds?: string[]) => void;
+    onCreateStoryboard?: () => void;
     onRetryItem: (batchId: string, itemId: string) => void;
     onAddReferenceColumn: () => void;
     onRemoveReferenceColumn?: () => void;
@@ -41,7 +42,7 @@ const OPERATION_OPTIONS = [
 
 type ReferenceCell = { rowId: string; columnIndex: number };
 
-export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, theme, onPatchTable, onAddRow, onRemoveRow, onUpdateRow, onFillRows, onGenerate, onRetryItem, onAddReferenceColumn, onRemoveReferenceColumn: _onRemoveReferenceColumn, onFocusOutput: _onFocusOutput, onAddTextColumn = () => {}, onReorderReferenceColumns, onMoveReferenceCell, onReplaceReference = () => {}, onUploadReference, onRemoveReference = () => {}, onConnectStart, onConnectDrop, readOnly = false }: Props) {
+export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, theme, onPatchTable, onAddRow, onRemoveRow, onUpdateRow, onFillRows, onGenerate, onCreateStoryboard, onRetryItem, onAddReferenceColumn, onRemoveReferenceColumn: _onRemoveReferenceColumn, onFocusOutput: _onFocusOutput, onAddTextColumn = () => {}, onReorderReferenceColumns, onMoveReferenceCell, onReplaceReference = () => {}, onUploadReference, onRemoveReference = () => {}, onConnectStart, onConnectDrop, readOnly = false }: Props) {
     const table = node.metadata?.batchTable || { operation: "try_on" as const, concurrency: 10, rows: [] };
     const referenceColumns = batchReferenceColumns(table);
     const textColumns = batchTextColumns(table);
@@ -49,9 +50,10 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
     const hasGlobalPrompt = Boolean(globalPrompt.trim());
     const nodeById = useMemo(() => new Map(nodes.map((item) => [item.id, item])), [nodes]);
     const batchItemByRowId = useMemo(() => new Map((batch?.items || []).map((item) => [item.rowId, item])), [batch?.items]);
-    const connectedImageCount = useMemo(() => new Set(connections.filter((connection) => connection.toNodeId === node.id).map((connection) => connection.fromNodeId)).size, [connections, node.id]);
+    const connectedMediaCount = useMemo(() => new Set(connections.filter((connection) => connection.toNodeId === node.id).map((connection) => connection.fromNodeId)).size, [connections, node.id]);
     const completed = table.rows.filter((row) => Boolean(row.outputNodeId && nodeById.get(row.outputNodeId)?.metadata?.content)).length;
     const isAiTable = Boolean(table.aiGenerated);
+    const isStoryboardTable = table.contentKind === "storyboard" && Boolean(table.storyboardRows?.length);
     const gridTemplateColumns = batchGridTemplateColumns(referenceColumns.length, textColumns.length);
     const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null);
     const [draggingCell, setDraggingCell] = useState<ReferenceCell | null>(null);
@@ -244,7 +246,7 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
                     aria-label="并发数"
                 />
                 <span className="opacity-55">
-                    {referenceColumns.length} 组参考 · 已连 {connectedImageCount} 张图 · 完成 {completed}/{table.rows.length}
+                    {referenceColumns.length} 组参考 · 已连 {connectedMediaCount} 个素材 · 完成 {completed}/{table.rows.length}
                 </span>
                 {!readOnly ? (
                     <div className="flex min-w-[280px] max-w-[min(42vw,520px)] flex-1 items-center gap-2">
@@ -268,6 +270,11 @@ export function CanvasBatchTableNodeContent({ node, nodes, connections, batch, t
                         <Button size="small" icon={<Plus className="size-3.5" />} onClick={onAddRow}>
                             加一行
                         </Button>
+                        {isStoryboardTable && onCreateStoryboard ? (
+                            <Button size="small" icon={<Film className="size-3.5" />} onClick={onCreateStoryboard}>
+                                创建视频脚本
+                            </Button>
+                        ) : null}
                         <Button size="small" type="primary" icon={<Play className="size-3.5" />} disabled={!table.rows.length} onClick={() => onGenerate()}>
                             生成未完成项
                         </Button>
@@ -590,7 +597,7 @@ function ReferenceThumbnail({ node, theme, readOnly, rowId, columnIndex, columnI
                 onLostPointerCapture={onLostPointerCapture}
                 onDragStart={(event) => event.preventDefault()}
             >
-                <CachedResourceImage draggable={false} eager src={node.metadata.previewContent || node.metadata.content} storageKey={node.metadata.storageKey} alt={node.title || "参考图"} className="size-16 select-none object-cover" fallback={fallback} />
+                <CachedResourceImage draggable={false} eager src={node.type === "video" ? node.metadata.videoPreview?.content || node.metadata.videoPreview?.storageKey || "" : node.metadata.previewContent || node.metadata.content} storageKey={node.type === "video" ? node.metadata.videoPreview?.storageKey || node.metadata.storageKey : node.metadata.storageKey} alt={node.title || (node.type === "video" ? "参考视频" : "参考图")} className="size-16 select-none object-cover" fallback={fallback} />
                 {!readOnly ? <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/55 px-1 py-1 text-[9px] text-white opacity-0 transition-opacity group-hover:opacity-100"><Upload className="size-3" />替换</span> : null}
                 {!readOnly ? (
                     <button

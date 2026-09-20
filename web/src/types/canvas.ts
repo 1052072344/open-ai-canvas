@@ -121,6 +121,10 @@ export type StoryboardRow = {
     timeBeats: string;
     imageGenerationPrompt: string;
     videoMotionPrompt: string;
+    /** 原视频拆解时的时间范围，用于自动抽取关键帧。 */
+    sourceStartMs?: number;
+    sourceEndMs?: number;
+    keyframeTimeMs?: number;
     imagePromptTemplateVariables?: Record<string, string>;
     videoPromptTemplateVariables?: Record<string, string>;
     mustHave: string[];
@@ -176,6 +180,7 @@ export type CanvasBatchRow = {
     cells?: Record<string, string>;
 };
 export type CanvasBatchColumnType = "image" | "text";
+export type CanvasBatchTableContentKind = "content" | "storyboard";
 export type CanvasBatchReferenceColumn = {
     id: string;
     label: string;
@@ -184,6 +189,11 @@ export type CanvasBatchReferenceColumn = {
 export type CanvasBatchTableData = {
     operation: CanvasBatchOperation;
     concurrency: number;
+    /** AI 输出的业务结构；分镜表会保留标准 StoryboardRow，避免依赖列名猜测。 */
+    contentKind?: CanvasBatchTableContentKind;
+    storyboardRows?: StoryboardRow[];
+    storyboardTitle?: string;
+    storyboardSourceNodeIds?: string[];
     /** Optional prompt override applied to every batch row while non-empty. */
     globalPrompt?: string;
     referenceColumns?: CanvasBatchReferenceColumn[];

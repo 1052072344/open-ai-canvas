@@ -112,6 +112,14 @@ func TestMatchCapabilityRoutesTextImagesOnlyToDeclaredProfiles(t *testing.T) {
 	}
 }
 
+func TestMatchCapabilityRoutesUndeclaredVideoToTextMultimodalProfile(t *testing.T) {
+	profile := CapabilitySpec{Version: 1, Capability: "text"}
+	intent := ModelRequestIntent{Capability: "text", Inputs: map[string]int{"video": 1}}
+	if match := MatchCapability(profile, intent); !match.Matched {
+		t.Fatalf("multimodal text profile should accept legacy undeclared video input: %#v", match)
+	}
+}
+
 func TestMatchCapabilityAcceptsWildcardOptionValues(t *testing.T) {
 	spec := CapabilitySpec{
 		Version:    1,

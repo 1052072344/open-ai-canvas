@@ -106,6 +106,7 @@ export const STANDARD_IMAGE_SIZE_VALUES = [
 ] as const;
 
 const DEFAULT_TEXT_REFERENCE_MAX_IMAGES = 16;
+const DEFAULT_TEXT_REFERENCE_MAX_VIDEOS = 3;
 
 function isKnownMultimodalTextModel(protocol?: ModelProtocol, model = "") {
     // These model families currently expose vision through their text/chat
@@ -298,8 +299,8 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
             promptMaxChars: 32000,
             maxImages: isKnownMultimodalTextModel(protocol, model) ? DEFAULT_TEXT_REFERENCE_MAX_IMAGES : 0,
             maxImageBytes: isKnownMultimodalTextModel(protocol, model) ? 30 * 1024 * 1024 : 0,
-            maxVideos: 0,
-            maxVideoBytes: 0,
+            maxVideos: isKnownMultimodalTextModel(protocol, model) ? DEFAULT_TEXT_REFERENCE_MAX_VIDEOS : 0,
+            maxVideoBytes: isKnownMultimodalTextModel(protocol, model) ? 200 * 1024 * 1024 : 0,
         },
     };
     const video: VideoCapabilityConfig = {
@@ -412,8 +413,8 @@ export function modelCapabilityConfigFor(config: { channels: Array<{ id: string;
     if (!cost?.capabilityConfig) return fallback;
     const capabilityConfig = normalizeModelCapabilityConfig(cost.capabilityConfig);
     const mergedText = capabilityConfig.text ? { ...fallback.text!, ...capabilityConfig.text, references: { ...fallback.text!.references, ...capabilityConfig.text.references } } : fallback.text;
-    const text = mergedText && isKnownMultimodalTextModel(cost?.protocol, modelName) && mergedText.references.maxImages === 0
-        ? { ...mergedText, references: { ...mergedText.references, maxImages: DEFAULT_TEXT_REFERENCE_MAX_IMAGES, maxImageBytes: mergedText.references.maxImageBytes || 30 * 1024 * 1024 } }
+    const text = mergedText && isKnownMultimodalTextModel(cost?.protocol, modelName) && (mergedText.references.maxImages === 0 || mergedText.references.maxVideos === 0)
+        ? { ...mergedText, references: { ...mergedText.references, maxImages: mergedText.references.maxImages || DEFAULT_TEXT_REFERENCE_MAX_IMAGES, maxImageBytes: mergedText.references.maxImageBytes || 30 * 1024 * 1024, maxVideos: mergedText.references.maxVideos || DEFAULT_TEXT_REFERENCE_MAX_VIDEOS, maxVideoBytes: mergedText.references.maxVideoBytes || 200 * 1024 * 1024 } }
         : mergedText;
     const video = capabilityConfig.video ? { ...fallback.video!, ...capabilityConfig.video, references: { ...fallback.video!.references, ...capabilityConfig.video.references } } : fallback.video;
     const configuredImage = capabilityConfig.image;

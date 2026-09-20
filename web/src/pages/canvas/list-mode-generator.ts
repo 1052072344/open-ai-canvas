@@ -1,10 +1,13 @@
 import { nanoid } from "nanoid";
 import { message } from "antd";
-import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasBatchTableData, type CanvasBatchRow } from "@/types/canvas";
+import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasBatchTableData, type CanvasBatchRow, type StoryboardRow } from "@/types/canvas";
 import { runBackendGenerationTask } from "@/services/api/generation-task";
 import { buildGenerationConfig, resolveCanvasGenerationModel } from "@/lib/canvas/canvas-project-generation";
 import { modelCompatibilityError, modelRequestOptions, resolveCompatibleModel, type ModelRequirements } from "@/lib/model-selection";
 import type { AiConfig } from "@/stores/use-config-store";
+import type { ReferenceVideo } from "@/types/media";
+import { createStoryboardRow, cinematicStoryboardColumns, storyboardRowsOutputContract } from "@/lib/canvas/canvas-project-domain";
+import type { StoryboardColumn } from "@/types/canvas";
 
 const LIST_MODE_SYSTEM_PROMPT = `你是一个电商内容分析助手。用户会给你产品图片和一个任务描述。
 请严格根据用户要求的数量生成数据；如果用户说“生成5个卖点”，就必须返回5行，每行一个独立卖点。
@@ -26,6 +29,35 @@ const LIST_MODE_SYSTEM_PROMPT = `你是一个电商内容分析助手。用户�
 6. 不要把多个编号卖点塞进一个单元格；不要把整段分析只放进“任务提示词”
 7. 列数建议 3-6 列，根据任务复杂度决定
 8. 只输出 JSON，不要有任何其他文字`;
+
+const VIDEO_LIST_MODE_SYSTEM_PROMPT = `你是专业的视频内容分析与分镜脚本助手。用户会给你一个视频和任务要求。
+请完整观看/理解视频内容，按时间顺序拆解关键情节、动作、台词、画面和镜头运动；不要只做概括。
+如果用户要求拆解脚本或关键帧，请为每个镜头输出可直接用于视频节点生成的结构化分镜数据。
+
+${storyboardRowsOutputContract("如果用户要求关键帧，请让每个镜头的 imageGenerationPrompt 能描述该镜头代表性首帧；durationSeconds 填写该镜头时长。")}
+输出格式：
+{
+  "title": "视频脚本拆解",
+  "rows": [
+    {
+      "shotNumber": 1,
+      "durationSeconds": 3,
+      "sourceStartSeconds": 0,
+      "sourceEndSeconds": 3,
+      "keyframeTimeSeconds": 1.5,
+      "plotDescription": "画面和动作",
+      "dialogue": "台词或旁白",
+      "shotSize": "景别",
+      "camera": "机位和镜头设计",
+      "motion": "运镜",
+      "videoMotionPrompt": "可直接用于视频生成的动态描述",
+      "imageGenerationPrompt": "可直接用于首帧生成的画面描述",
+      "audioEffects": "音乐/音效",
+      "continuityOut": "镜头结尾状态"
+    }
+  ]
+}
+只输出 JSON，不要 Markdown、代码块或解释文字。`;
 
 type ListGenerationResult = {
     columns: string[];
@@ -69,6 +101,98 @@ export function parseListModeJson(text: string): ListGenerationResult | null {
         }
     }
     return null;
+}
+
+export function parseStoryboardJson(text: string): { title?: string; rows: StoryboardRow[] } | null {
+    const candidates = [
+        text.trim(),
+        ...Array.from(text.matchAll(/```(?:json)?\s*([\s\S]*?)\s*```/gi), (match) => match[1].trim()),
+        ...balancedJsonObjects(text),
+    ];
+    for (const candidate of candidates) {
+        try {
+            const parsed = JSON.parse(candidate) as { title?: unknown; rows?: unknown };
+            if (!Array.isArray(parsed.rows) || !parsed.rows.length) continue;
+            const rows = parsed.rows
+                .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row))
+                .map((row, index) => createStoryboardRow(index + 1, {
+                    shotNumber: Number(row.shotNumber) || index + 1,
+                    durationSeconds: Math.max(1, Math.min(60, Number(row.durationSeconds) || 6)),
+                    sourceStartMs: Number.isFinite(Number(row.sourceStartSeconds)) ? Math.max(0, Number(row.sourceStartSeconds) * 1000) : undefined,
+                    sourceEndMs: Number.isFinite(Number(row.sourceEndSeconds)) ? Math.max(0, Number(row.sourceEndSeconds) * 1000) : undefined,
+                    keyframeTimeMs: Number.isFinite(Number(row.keyframeTimeSeconds)) ? Math.max(0, Number(row.keyframeTimeSeconds) * 1000) : undefined,
+                    plotDescription: listCellText(row.plotDescription),
+                    dialogue: listCellText(row.dialogue),
+                    narrativeIntent: listCellText(row.narrativeIntent),
+                    viewerPOV: listCellText(row.viewerPOV),
+                    performanceBlocking: listCellText(row.performanceBlocking),
+                    shotSize: listCellText(row.shotSize),
+                    emotion: listCellText(row.emotion),
+                    lightingAndAtmosphere: listCellText(row.lightingAndAtmosphere),
+                    audioEffects: listCellText(row.audioEffects),
+                    camera: listCellText(row.camera),
+                    motion: listCellText(row.motion),
+                    timeBeats: listCellText(row.timeBeats),
+                    imageGenerationPrompt: listCellText(row.imageGenerationPrompt) || listCellText(row.plotDescription),
+                    videoMotionPrompt: listCellText(row.videoMotionPrompt) || [listCellText(row.plotDescription), listCellText(row.motion)].filter(Boolean).join("；"),
+                    mustHave: Array.isArray(row.mustHave) ? row.mustHave.map(listCellText).filter(Boolean) : [],
+                    optionalDetails: Array.isArray(row.optionalDetails) ? row.optionalDetails.map(listCellText).filter(Boolean) : [],
+                    continuityOut: listCellText(row.continuityOut),
+                    negativePrompt: listCellText(row.negativePrompt),
+                }));
+            if (rows.length) return { title: typeof parsed.title === "string" ? parsed.title : undefined, rows };
+        } catch {
+            // Continue with the next JSON candidate.
+        }
+    }
+    return null;
+}
+
+function isLikelyVideoUrl(value: string) {
+    try {
+        const url = new URL(value);
+        if (!/^https?:$/i.test(url.protocol)) return false;
+        return /\.(mp4|mov|webm|m4v|avi|mkv|m3u8)(?:$|[?#])/i.test(url.pathname + url.search) || /(?:video|vod|stream|play|media)/i.test(url.pathname + url.search);
+    } catch {
+        return false;
+    }
+}
+
+function videoUrlsFromPrompt(prompt: string) {
+    const wantsVideo = /视频|拆解|脚本|关键帧|video|storyboard/i.test(prompt);
+    return Array.from(prompt.matchAll(/https?:\/\/[^\s<>()"']+/gi), (match) => match[0].replace(/[，。！？；;]+$/, "")).filter((url) => wantsVideo || isLikelyVideoUrl(url));
+}
+
+function storyboardColumnLabel(column: StoryboardColumn) {
+    const labels: Partial<Record<StoryboardColumn, string>> = {
+        durationSeconds: "时长（秒）",
+        plotDescription: "画面描述",
+        dialogue: "台词/旁白",
+        narrativeIntent: "叙事目的",
+        viewerPOV: "观看视角",
+        performanceBlocking: "动作调度",
+        shotSize: "景别",
+        emotion: "情绪",
+        lightingAndAtmosphere: "光影氛围",
+        audioEffects: "音效/音乐",
+        camera: "镜头设计",
+        motion: "运镜",
+        timeBeats: "时间节拍",
+        imageGenerationPrompt: "首帧提示词",
+        videoMotionPrompt: "视频提示词",
+        continuityOut: "结尾状态",
+        negativePrompt: "负面提示词",
+    };
+    return labels[column] || column;
+}
+
+function storyboardCells(row: StoryboardRow) {
+    const values: Record<string, string> = {};
+    const fields: Array<keyof StoryboardRow> = ["durationSeconds", "plotDescription", "dialogue", "narrativeIntent", "viewerPOV", "performanceBlocking", "shotSize", "emotion", "lightingAndAtmosphere", "audioEffects", "camera", "motion", "timeBeats", "imageGenerationPrompt", "videoMotionPrompt", "continuityOut", "negativePrompt"];
+    fields.forEach((field) => { values[`storyboard-${field}`] = String(row[field] || ""); });
+    values[`storyboard-mustHave`] = row.mustHave.join("、");
+    values[`storyboard-optionalDetails`] = row.optionalDetails.join("、");
+    return values;
 }
 
 function balancedJsonObjects(text: string) {
@@ -182,14 +306,18 @@ export async function handleListGenerate({
     const sourceNode = nodes.find((n) => n.id === sourceNodeId);
     if (!sourceNode) return;
 
-    // Find connected image nodes
+    // Find connected media nodes. 视频列表模式不再强制要求图片；可使用连接的视频节点，
+    // 或从提示词中识别出直接粘贴的视频地址。
     const connectedImageIds = connections
         .filter((c) => c.toNodeId === sourceNodeId && c.fromNodeId !== sourceNodeId)
         .map((c) => c.fromNodeId);
     const imageNodes = nodes.filter((n) => connectedImageIds.includes(n.id) && n.type === CanvasNodeType.Image && Boolean(n.metadata?.content || n.metadata?.storageKey));
+    const videoNodes = nodes.filter((n) => connectedImageIds.includes(n.id) && n.type === CanvasNodeType.Video && Boolean(n.metadata?.content || n.metadata?.storageKey));
+    const promptVideoUrls = videoNodes.length ? [] : videoUrlsFromPrompt(prompt);
+    const isVideoAnalysis = videoNodes.length > 0 || promptVideoUrls.length > 0;
 
-    if (imageNodes.length === 0) {
-        message.warning("请先连接至少一张图片到当前文本节点");
+    if (imageNodes.length === 0 && !isVideoAnalysis) {
+        message.warning("请先连接图片或视频到当前文本节点，也可以直接粘贴可访问的视频地址");
         return;
     }
 
@@ -202,14 +330,14 @@ export async function handleListGenerate({
         // 实际请求却会发给不支持图片的旧模型。
         const requirements: ModelRequirements = {
             capability: "text",
-            input: { textCount: 1, imageCount: imageNodes.length, videoCount: 0, audioCount: 0, characterCount: 0 },
+            input: { textCount: 1, imageCount: imageNodes.length, videoCount: videoNodes.length + promptVideoUrls.length, audioCount: 0, characterCount: 0 },
             options: modelRequestOptions(config, "text"),
         };
         const preferredModel = resolveCanvasGenerationModel(config, sourceNode.metadata?.model, "text") || resolveCanvasGenerationModel(config, config.textModel, "text");
         if (!preferredModel) throw new Error("当前没有可用的文本模型，请先在模型设置中选择模型");
         const compatibleModel = resolveCompatibleModel(config, preferredModel, requirements);
         if (!compatibleModel || modelCompatibilityError(config, compatibleModel, requirements)) {
-            throw new Error("当前文本模型不支持图片理解，请在节点底部选择支持图片输入的 Gemini 或其他多模态模型");
+            throw new Error(isVideoAnalysis ? "当前文本模型不支持视频理解，请选择支持视频输入的 Gemini、GPT 或豆包多模态模型" : "当前文本模型不支持图片理解，请在节点底部选择支持图片输入的 Gemini、GPT 或豆包多模态模型");
         }
         const sourceNodeForConfig = { ...sourceNode, metadata: { ...(sourceNode.metadata || {}), model: compatibleModel } };
         const listConfig = { ...buildGenerationConfig(config, sourceNodeForConfig, "text", requirements), model: compatibleModel };
@@ -221,8 +349,19 @@ export async function handleListGenerate({
             dataUrl: node.metadata?.content || "",
             storageKey: node.metadata?.storageKey,
         }));
+        const referenceVideos: ReferenceVideo[] = [
+            ...videoNodes.map((node) => ({
+                id: node.id,
+                name: node.title || "video",
+                type: "video",
+                url: node.metadata?.content || "",
+                storageKey: node.metadata?.storageKey,
+                durationMs: node.metadata?.durationMs,
+            })),
+            ...promptVideoUrls.map((url, index) => ({ id: `prompt-video-${index}`, name: `video-${index + 1}`, type: "video", url })),
+        ];
 
-        const fullPrompt = `${LIST_MODE_SYSTEM_PROMPT}\n\n用户任务：${prompt}\n\n图片数量：${imageNodes.length} 张\n目标行数：${targetRowCount || "未指定，按任务判断"}`;
+        const fullPrompt = `${isVideoAnalysis ? VIDEO_LIST_MODE_SYSTEM_PROMPT : LIST_MODE_SYSTEM_PROMPT}\n\n用户任务：${prompt}\n\n图片数量：${imageNodes.length} 张\n视频数量：${referenceVideos.length} 个\n目标行数：${targetRowCount || "未指定，按任务判断"}`;
 
         const result = await runBackendGenerationTask({
             projectId,
@@ -230,10 +369,63 @@ export async function handleListGenerate({
             prompt: fullPrompt,
             config: listConfig,
             referenceImages,
+            referenceVideos,
             streamText: false,
         });
 
         const text = result.text || "";
+        if (isVideoAnalysis) {
+            const storyboard = parseStoryboardJson(text);
+            if (!storyboard) {
+                message.error("视频分析返回格式异常，请重试");
+                return;
+            }
+            const storyboardRows = storyboard.rows.map((row, index) => ({ ...row, shotNumber: index + 1 }));
+            const batchTable: CanvasBatchTableData = {
+                operation: "creative",
+                concurrency: 10,
+                aiGenerated: true,
+                contentKind: "storyboard",
+                storyboardRows,
+                storyboardTitle: storyboard.title || "视频脚本拆解",
+                storyboardSourceNodeIds: [...videoNodes.map((node) => node.id), ...imageNodes.map((node) => node.id)],
+                referenceColumns: [{ id: "ai-ref", label: "输入视频", type: "image" }],
+                textColumns: cinematicStoryboardColumns()
+                    .filter((column) => !["shotNumber", "assets"].includes(column))
+                    .map((column) => ({ id: `storyboard-${column}`, label: storyboardColumnLabel(column), type: "text" as const })),
+                rows: storyboardRows.map((row) => ({
+                    id: row.id,
+                    enabled: true,
+                    inputNodeIds: videoNodes.length ? [videoNodes[0].id] : [],
+                    prompt: row.videoMotionPrompt || row.plotDescription,
+                    cells: storyboardCells(row),
+                })),
+            };
+            const sourcePos = sourceNode.position;
+            const batchNodeId = `batch-table-${nanoid()}`;
+            const batchNode: CanvasNodeData = {
+                id: batchNodeId,
+                type: CanvasNodeType.BatchTable,
+                title: storyboard.title || "视频分镜多维表格",
+                position: { x: sourcePos.x + 400, y: sourcePos.y },
+                width: 1280,
+                height: 560,
+                metadata: { batchTable, model: listConfig.model, status: "idle" },
+            };
+            const newConnections: CanvasConnection[] = [...videoNodes, ...imageNodes].map((inputNode) => ({
+                id: `conn-${nanoid()}`,
+                fromNodeId: inputNode.id,
+                fromHandleId: "output",
+                toNodeId: batchNodeId,
+                toHandleId: "batch-reference:ai-ref",
+                relation: "batch-input",
+            }));
+            setNodes((prev) => [...prev, batchNode]);
+            setConnections((prev) => [...prev, ...newConnections]);
+            setDialogNodeId(batchNodeId);
+            message.success(`已生成视频分镜表：${storyboardRows.length} 个镜头`);
+            return;
+        }
         const parsed = parseListModeJson(text);
 
         if (!parsed) {
