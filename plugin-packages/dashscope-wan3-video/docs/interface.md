@@ -86,7 +86,7 @@
 
 ## 兼容边界
 
-Wan 3.0 原生异步视频。模型仅 wan3.0-video-prime / wan3.0-video；input.media 为 type+url；UNKNOWN 视为失败。文档：https://docs.bailian.console.aliyun.com/zh/model-studio/wan3-video-generation-api-reference。
+该包只代表上述线协议 profile；同一品牌的其他 endpoint、云区域或网关包装必须使用独立插件，不能根据模型名猜测。
 
 <!-- YINGCE_MANIFEST_CONTRACT_START -->
 ## Manifest 完整接口定义

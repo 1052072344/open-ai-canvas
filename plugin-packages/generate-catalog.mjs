@@ -920,7 +920,6 @@ const wan3MediaType = coalesce(
 add({
   id: "dashscope-wan3-video", providerId: "dashscope-wan3-video", name: "DashScope Wan 3.0 Video", vendor: "Alibaba Cloud", capability: "video",
   baseUrl: "https://dashscope.aliyuncs.com", auth: bearer, params: videoParams, requiresPublicMediaUrls: true,
-  notes: `Wan 3.0 原生异步视频。模型仅 wan3.0-video-prime / wan3.0-video；input.media 为 type+url；UNKNOWN 视为失败。文档：https://docs.bailian.console.aliyun.com/zh/model-studio/wan3-video-generation-api-reference。`,
   validations: [
     { assert: { $in: [lower(ref("request.model")), ["wan3.0-video-prime", "wan3.0-video"]] }, message: "Wan 3.0 Video 仅支持 wan3.0-video-prime 或 wan3.0-video" },
     { assert: { $lte: [len(mediaWithRoles("request.images", ["first_frame"])), 1] }, message: "Wan 3.0 Video 最多只能有一个 first_frame" },
