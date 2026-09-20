@@ -254,6 +254,8 @@ export type CanvasNodeMetadata = {
     richText?: Record<string, unknown>;
     composerContent?: string;
     prompt?: string;
+    /** 文本节点是否处于列表模式；用于触发多模态分析并创建多维表格。 */
+    listMode?: boolean;
     promptTemplateOperation?: string;
     promptTemplateVariables?: Record<string, string>;
     status?: CanvasNodeStatus;
