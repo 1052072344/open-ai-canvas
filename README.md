@@ -7,7 +7,7 @@
 <p align="center">让一个故事，从文字走向银幕</p>
 
 <p align="center">
-  <a href="https://github.com/ddcat-ai/open-ai-canvas">GitHub</a> ·
+  <a href="https://github.com/1052072344/open-ai-canvas">GitHub</a> ·
   <a href="docs/content/docs/overview/features.mdx">功能</a> ·
   <a href="docs/content/docs/overview/quick-start.mdx">文档</a> ·
   <a href="SECURITY.md">安全策略</a>
@@ -45,7 +45,7 @@
 ### 宿主机启动
 
 ```bash
-git clone https://github.com/ddcat-ai/open-ai-canvas.git
+git clone https://github.com/1052072344/open-ai-canvas.git
 cd open-ai-canvas
 
 # 使用 Git 忽略的目录保存本地开发数据和缓存
@@ -117,7 +117,7 @@ docker compose -f docker-compose.local.yml up -d --build
 适用于 Linux 云服务器。脚本会安装 Docker、拉取源码、生成受保护的 `.env`，并启动 PostgreSQL、Redis、后端和网页：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ddcat-ai/open-ai-canvas/main/scripts/install-server.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/1052072344/open-ai-canvas/main/scripts/install-server.sh | sudo bash
 ```
 
 默认访问 `http://服务器IP:3000`。更新或排查：
@@ -135,7 +135,7 @@ sudo docker compose --env-file .env \
 不需要源码时，可使用镜像部署脚本：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ddcat-ai/open-ai-canvas/main/scripts/install-server-image.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/1052072344/open-ai-canvas/main/scripts/install-server-image.sh | sudo bash
 ```
 
 生产环境请在 `/opt/open-ai-canvas/.env` 中将 `CANVAS_IMAGE_TAG` 固定为具体 Release，不要使用 `latest`。更新流程、数据库迁移、备份和回退说明见[系统更新文档](docs/content/docs/backend/system-update.mdx)。

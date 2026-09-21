@@ -2,7 +2,7 @@
 
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS payment-package-build
 
-ARG GOPROXY=https://proxy.golang.org,direct
+ARG GOPROXY=https://proxy.golang.org|https://goproxy.cn|direct
 ENV GOPROXY=$GOPROXY
 
 RUN apk add --no-cache nodejs unzip zip
@@ -33,7 +33,7 @@ RUN PAYMENT_PLUGIN_SMOKE_TEST=1 \
 
 FROM golang:1.25-alpine AS backend-build
 
-ARG GOPROXY=https://proxy.golang.org,direct
+ARG GOPROXY=https://proxy.golang.org|https://goproxy.cn|direct
 ENV GOPROXY=$GOPROXY
 
 RUN apk add --no-cache build-base

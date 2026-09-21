@@ -69,10 +69,16 @@ func StringValue(value any) string {
 // TruncateRunes 截断字符串到指定 rune 数。
 func TruncateRunes(value string, limit int) string {
 	runes := []rune(value)
+	if limit <= 0 {
+		return ""
+	}
 	if len(runes) <= limit {
 		return value
 	}
-	return string(runes[:limit]) + "..."
+	if limit <= 3 {
+		return string(runes[:limit])
+	}
+	return string(runes[:limit-3]) + "..."
 }
 
 // Megabytes 转换 MB 到字节。

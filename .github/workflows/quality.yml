@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # “|” 会在超时、连接中断等任意错误后继续尝试下一个代理。
+  GOPROXY: https://proxy.golang.org|https://goproxy.cn|direct
+
 jobs:
   backend:
     name: Backend checks

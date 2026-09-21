@@ -12,7 +12,7 @@ import { chapters, getWelcomeLook, showcases, welcomeLooks, type WelcomeLook } f
 import "./welcome.css";
 
 const StoryReel = lazy(() => import("./story-reel"));
-const github = "https://github.com/ddcat-ai/open-ai-canvas";
+const github = "https://github.com/1052072344/open-ai-canvas";
 
 export default function WelcomePage() {
     const [look, setLook] = useState(getWelcomeLook);

@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # 发布测试、镜像构建与 Release 二进制使用同一套依赖下载故障转移。
+  GOPROXY: https://proxy.golang.org|https://goproxy.cn|direct
+
 # main 和 tag 的同一提交串行进入；后到的一轮复用已校验的 SHA 镜像。
 concurrency:
   group: publish-${{ github.sha }}
@@ -100,6 +104,7 @@ jobs:
           platforms: ${{ matrix.platforms }}
           push: true
           build-args: |
+            GOPROXY=${{ env.GOPROXY }}
             BUILD_VERSION=${{ needs.prepare.outputs.version }}
             BUILD_COMMIT=${{ github.sha }}
             BUILD_TIME=${{ needs.prepare.outputs.build_time }}
